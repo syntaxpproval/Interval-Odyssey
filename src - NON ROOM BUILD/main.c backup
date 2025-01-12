@@ -1,0 +1,884 @@
+#include <gb/gb.h>
+#include <rand.h>
+#include <stdint.h>
+#include "tileset.h"
+#include <string.h>
+#include "combat.h"
+#include "sound.h"
+
+extern const unsigned char multi_tiles[];
+
+#define ABS(n) ((n) < 0 ? -(n) : (n))
+
+void handle_combat(UINT8 enemy_x, UINT8 enemy_y);
+void draw_status_bar(void);
+void init_room(void);
+void draw_room(void);
+void init_enemies(void);
+void handle_player_death(void);
+void start_quiz_mode(void);
+void draw_quiz_screen(void);
+void handle_quiz_input(UINT8 joy);
+
+// Add function prototype at top
+void move_enemies(void);
+
+// Game state
+UINT8 in_game_over = 0;
+UINT8 room[ROOM_HEIGHT][ROOM_WIDTH];  // Now stores metatile IDs
+UINT8 player_x = 1;
+UINT8 player_y = 1;
+UINT8 move_delay = 0;
+UINT8 level = 1;
+UINT8 player_hp = 10;
+UINT8 max_hp = 10;
+UINT8 has_key = 0;
+UINT8 key_x;
+UINT8 key_y;
+UINT8 gate_x;
+UINT8 gate_y;
+UINT8 attack_level = 1;
+UINT8 defense_level = 1;
+UINT8 player_xp = 0;
+Enemy enemies[MAX_ENEMIES];
+UINT8 num_enemies;
+#define MOVE_SPEED 14
+#define NUM_MENU_ITEMS 4  // Changed from 3 to 4
+#define MENU_PLAY 0
+#define MENU_SETTINGS 1
+#define MENU_SCORES 2
+#define MENU_CHORD_MODE 3  // New menu item
+UINT8 in_menu = 1;
+UINT8 menu_selection = 0;
+
+// Add to state variables
+UINT8 in_quiz_mode = 0; 
+ChordType current_chord;
+
+// Add to game state variables at top of main.c
+PlayerAnimation player_anim = {
+    .direction = 0,  // Start facing front
+    .frame = 0,      // Standing frame
+    .frame_count = 0 // Animation counter
+};
+
+// Room dimensions
+#define STATUS_ROW 17  // Bottom row for status info
+
+void init_graphics(void) {
+    // Load font tiles first (0-127)
+    set_bkg_data(0, 128, TILESET);
+    
+    // Load game tiles (128-135)
+    set_bkg_data(128, 8, game_tiles);
+    
+    // Load multi tiles (136+)
+    set_bkg_data(136, 80, multi_tiles);
+}
+
+void draw_menu_screen(void) {
+    // Clear screen
+    fill_bkg_rect(0, 0, 20, 18, char_to_tile[' ']);
+    
+    // Draw title - moved over by 2 tiles (16 pixels)
+    draw_text(2, 4, "INTERVAL ODYSSEY");
+    
+    // Draw menu items
+    const char* menu_items[] = {
+        "PLAY GAME",
+        "SETTINGS",
+        "HIGH SCORES",
+        "CHORD MODE"
+    };
+    
+    for(UINT8 i = 0; i < NUM_MENU_ITEMS; i++) {
+        UINT8 y = 8 + (i * 2);  // Space items vertically
+        
+        // Draw selection indicators (music notes) if this item is selected
+        if(i == menu_selection) {
+            draw_special_tile(3, y, TILE_MUSICNOTE);
+            draw_special_tile(13, y, TILE_MUSICNOTE);
+        }
+        
+        // Draw menu text
+        draw_text(4, y, menu_items[i]);
+    }
+}
+
+void draw_settings_screen(void) {
+    // Clear screen
+    fill_bkg_rect(0, 0, 20, 18, char_to_tile[' ']);
+    
+    // Draw title
+    draw_text(4, 4, "SETTINGS");
+    
+    // Placeholder content
+    draw_text(2, 8, "SOUND FX:  ON");
+    draw_text(2, 10, "MUSIC:    ON");
+    draw_text(2, 12, "DIFFICULTY: NORMAL");
+    
+    // Draw return instruction
+    draw_text(2, 16, "PRESS B TO RETURN");
+}
+
+void draw_high_scores_screen(void) {
+    // Clear screen
+    fill_bkg_rect(0, 0, 20, 18, char_to_tile[' ']);
+    
+    // Draw title
+    draw_text(3, 2, "HIGH SCORES");
+    
+    // Placeholder scores
+    draw_text(2, 4, "1. AAA  LVL 10");
+    draw_text(2, 6, "2. BBB  LVL 8");
+    draw_text(2, 8, "3. CCC  LVL 7");
+    draw_text(2, 10, "4. DDD  LVL 5");
+    draw_text(2, 12, "5. EEE  LVL 3");
+    
+    // Draw return instruction
+    draw_text(2, 16, "PRESS B TO RETURN");
+}
+
+// Add to handle_menu_input:
+void handle_menu_input(UINT8 joy) {
+    static UINT8 last_joy = 0;
+    if(joy == last_joy) return;
+    last_joy = joy;
+    
+    if(joy & J_UP) {
+        if(menu_selection > 0) {
+            menu_selection--;
+            play_menu_sound();
+            draw_menu_screen();
+        }
+    }
+    else if(joy & J_DOWN) {
+        if(menu_selection < NUM_MENU_ITEMS - 1) {
+            menu_selection++;
+            play_menu_sound();
+            draw_menu_screen();
+        }
+    }
+    else if(joy & J_START || joy & J_A) {
+        switch(menu_selection) {
+            case MENU_PLAY:
+                in_menu = 0;
+                init_graphics();
+                start_background_music();
+                init_room();
+                draw_room();
+                break;
+            case MENU_SETTINGS:
+                draw_settings_screen();
+                break;
+            case MENU_SCORES:
+                draw_high_scores_screen();
+                break;
+            case MENU_CHORD_MODE:
+                // TODO: Will implement next
+                break;
+        }
+    }
+    else if(joy & J_B) {
+        // Return to main menu from any sub-screen
+        draw_menu_screen();
+    }
+}
+
+
+void draw_status_bar(void) {
+    UINT8 x;
+    
+    // Border for actual status bar (only at STATUS_ROW, not STATUS_ROW-1)
+    for(x = 0; x < ROOM_WIDTH * 2; x++) {
+        set_bkg_tile_xy(x, STATUS_ROW, TILE_WALL_TL);
+    }
+    
+    // Fill status bar background with dark tiles
+    for(x = 0; x < ROOM_WIDTH * 2; x++) {
+        set_bkg_tile_xy(x, STATUS_ROW, TILE_WALL_TL); // Using wall tile for dark background
+    }
+    
+    // Draw level info (bright on dark)
+    draw_text(0, STATUS_ROW, "LV.");
+    if(level < 10) {
+        draw_text(3, STATUS_ROW, "0");
+        UINT8 level_char = (UINT8)('0' + level);
+        set_bkg_tile_xy(4, STATUS_ROW, char_to_tile[level_char]);
+    } else {
+        UINT8 tens = (UINT8)('0' + (level / 10));
+        UINT8 ones = (UINT8)('0' + (level % 10));
+        set_bkg_tile_xy(3, STATUS_ROW, char_to_tile[tens]);
+        set_bkg_tile_xy(4, STATUS_ROW, char_to_tile[ones]);
+    }
+    
+    // Draw music note and HP
+    draw_special_tile(6, STATUS_ROW, TILE_MUSICNOTE);
+    draw_text(8, STATUS_ROW, "HP:");
+    
+    // Convert HP to characters
+    UINT8 current_hp_tens = (UINT8)('0' + (player_hp / 10));
+    UINT8 current_hp_ones = (UINT8)('0' + (player_hp % 10));
+    UINT8 max_hp_tens = (UINT8)('0' + (max_hp / 10));
+    UINT8 max_hp_ones = (UINT8)('0' + (max_hp % 10));
+    
+    // Draw HP numbers
+    set_bkg_tile_xy(11, STATUS_ROW, char_to_tile[current_hp_tens]);
+    set_bkg_tile_xy(12, STATUS_ROW, char_to_tile[current_hp_ones]);
+    draw_text(13, STATUS_ROW, "/");
+    set_bkg_tile_xy(14, STATUS_ROW, char_to_tile[max_hp_tens]);
+    set_bkg_tile_xy(15, STATUS_ROW, char_to_tile[max_hp_ones]);
+    
+    // Add key status at the end
+    draw_special_tile(17, STATUS_ROW, has_key ? TILE_UNLOCK : TILE_LOCK);
+}
+
+UINT8 check_path(UINT8 start_x, UINT8 start_y, UINT8 end_x, UINT8 end_y) {
+    #define MAX_QUEUE 32  // Reduced queue size
+    UINT8 visited[ROOM_HEIGHT][ROOM_WIDTH];
+    UINT8 queue_x[MAX_QUEUE];
+    UINT8 queue_y[MAX_QUEUE];
+    UINT8 queue_head = 0;
+    UINT8 queue_tail = 0;
+    UINT8 x, y;
+
+    // Clear visited array
+    memset(visited, 0, sizeof(visited));
+
+    // Add start position
+    queue_x[0] = start_x;
+    queue_y[0] = start_y;
+    queue_tail = 1;
+    visited[start_y][start_x] = 1;
+
+    // Process queue
+    while(queue_head < queue_tail) {
+        x = queue_x[queue_head];
+        y = queue_y[queue_head];
+        queue_head++;
+
+        // Check if at end
+        if(x == end_x && y == end_y) {
+            return 1;
+        }
+
+        // Check each direction
+        if(y > 0 && !visited[y-1][x] && room[y-1][x] != MT_OBSTACLE && queue_tail < MAX_QUEUE) {
+            queue_x[queue_tail] = x;
+            queue_y[queue_tail] = y-1;
+            visited[y-1][x] = 1;
+            queue_tail++;
+        }
+        if(x < ROOM_WIDTH-1 && !visited[y][x+1] && room[y][x+1] != MT_OBSTACLE && queue_tail < MAX_QUEUE) {
+            queue_x[queue_tail] = x+1;
+            queue_y[queue_tail] = y;
+            visited[y][x+1] = 1;
+            queue_tail++;
+        }
+        if(y < ROOM_HEIGHT-1 && !visited[y+1][x] && room[y+1][x] != MT_OBSTACLE && queue_tail < MAX_QUEUE) {
+            queue_x[queue_tail] = x;
+            queue_y[queue_tail] = y+1;
+            visited[y+1][x] = 1;
+            queue_tail++;
+        }
+        if(x > 0 && !visited[y][x-1] && room[y][x-1] != MT_OBSTACLE && queue_tail < MAX_QUEUE) {
+            queue_x[queue_tail] = x-1;
+            queue_y[queue_tail] = y;
+            visited[y][x-1] = 1;
+            queue_tail++;
+        }
+    }
+    return 0;
+}
+
+void place_obstacles(void) {
+    // Simpler obstacle scaling
+    UINT8 num_obstacles = 2;
+    if(level > 5) num_obstacles = 3;
+    if(level > 10) num_obstacles = 4;
+    if(level > 15) num_obstacles = 5;
+    
+    UINT8 obstacles_placed = 0;
+    UINT8 attempts = 0;
+    const UINT8 MAX_ATTEMPTS = 30;
+
+    // Keep track of safe spaces around player
+    UINT8 safe_x[] = {1, 2, 1, 1};
+    UINT8 safe_y[] = {1, 1, 2, 0};
+    UINT8 num_safe = 4;
+
+    while(obstacles_placed < num_obstacles && attempts < MAX_ATTEMPTS) {
+        UINT8 x = (randw() % ROOM_WIDTH);
+        UINT8 y = (randw() % ROOM_HEIGHT);
+        UINT8 is_safe = 1;
+        UINT8 i;
+
+        // Check if position is in safe zone
+        for(i = 0; i < num_safe; i++) {
+            if(x == safe_x[i] && y == safe_y[i]) {
+                is_safe = 0;
+                break;
+            }
+        }
+
+        // Don't place near gate
+        if(x >= ROOM_WIDTH-3 && y == ROOM_HEIGHT/2) {
+            is_safe = 0;
+        }
+
+        // Check if position is empty floor and safe
+if(room[y][x] == MT_FLOOR && is_safe) {
+    room[y][x] = MT_OBSTACLE;
+    
+    if(check_path(player_x, player_y, key_x, key_y) && 
+       check_path(key_x, key_y, gate_x, gate_y)) {
+        // Keep both logical and visual updates
+        room[y][x] = MT_OBSTACLE;
+        set_metatile16(x, y, MTL_WALL1);
+        obstacles_placed++;
+    } else {
+        room[y][x] = MT_FLOOR;
+    }
+}
+        attempts++;
+    }
+}
+
+void start_quiz_mode(void) {
+    in_quiz_mode = 1;
+    current_chord = (ChordType)(randw() % 3);
+    
+    draw_quiz_screen();
+    play_arpeggio(current_chord);
+}
+
+// In main.c
+void move_enemies(void) {
+    UINT8 i;
+    UINT8 enemies_moved = 0;
+    
+    // Save current positions in temporary array
+    struct {
+        UINT8 x;
+        UINT8 y;
+        UINT8 type;
+    } new_positions[MAX_ENEMIES];
+    
+    // First pass: Calculate new positions
+    for(i = 0; i < MAX_ENEMIES; i++) {
+        if(!enemies[i].active) continue;
+        
+        // Store current position as default
+        new_positions[i].x = enemies[i].x;
+        new_positions[i].y = enemies[i].y;
+        new_positions[i].type = enemies[i].type;
+        
+        // Distance to player
+        INT8 dx = player_x - enemies[i].x;
+        INT8 dy = player_y - enemies[i].y;
+        
+        // If adjacent to player, attack instead of moving
+        if((ABS(dx) == 1 && dy == 0) || (ABS(dy) == 1 && dx == 0)) {
+            handle_enemy_attack(enemies[i].x, enemies[i].y);
+            continue;
+        }
+        
+        // Calculate potential new position
+        UINT8 new_x = enemies[i].x;
+        UINT8 new_y = enemies[i].y;
+        
+        if(ABS(dx) >= ABS(dy)) {
+            if(dx != 0) {
+                new_x = enemies[i].x + (dx > 0 ? 1 : -1);
+            }
+        } else {
+            if(dy != 0) {
+                new_y = enemies[i].y + (dy > 0 ? 1 : -1);
+            }
+        }
+        
+        // Verify move is valid
+        if(room[new_y][new_x] == MT_FLOOR) {
+            new_positions[i].x = new_x;
+            new_positions[i].y = new_y;
+            enemies_moved = 1;
+        }
+    }
+    
+    // Second pass: Clear old positions
+    for(i = 0; i < MAX_ENEMIES; i++) {
+        if(!enemies[i].active) continue;
+        
+        // Only clear if enemy is actually moving
+        if(enemies[i].x != new_positions[i].x || 
+           enemies[i].y != new_positions[i].y) {
+            room[enemies[i].y][enemies[i].x] = MT_FLOOR;
+            set_metatile16(enemies[i].x, enemies[i].y, MTL_FLOOR);
+        }
+    }
+    
+    // Third pass: Update positions and draw
+    for(i = 0; i < MAX_ENEMIES; i++) {
+        if(!enemies[i].active) continue;
+        
+        // Update position
+        enemies[i].x = new_positions[i].x;
+        enemies[i].y = new_positions[i].y;
+        
+        // Draw enemy in new position
+        room[enemies[i].y][enemies[i].x] = MT_ENEMY_X + enemies[i].type;
+        set_metatile16(enemies[i].x, enemies[i].y, MTL_ENEMY_X + enemies[i].type);
+    }
+}
+
+void init_room(void) {
+    UINT8 x, y;
+    
+    // Clear everything to floor metatiles
+    for(y = 0; y < ROOM_HEIGHT; y++) {
+        for(x = 0; x < ROOM_WIDTH; x++) {
+            room[y][x] = MT_FLOOR;
+            set_metatile16(x, y, MTL_FLOOR);
+        }
+    }
+    
+    // Place the key in a random position
+    do {
+        key_x = 1 + (randw() % (ROOM_WIDTH-2));  // Ensure key isn't on walls
+        key_y = 1 + (randw() % (ROOM_HEIGHT-2));
+    } while(key_x == player_x && key_y == player_y); // Don't place on player
+    
+    room[key_y][key_x] = MT_KEY;
+    set_metatile16(key_x, key_y, MTL_KEY);
+    
+    // Place the gate near the right edge (adjusted for new dimensions)
+    gate_x = ROOM_WIDTH-1;
+    gate_y = ROOM_HEIGHT/2;
+	room[gate_y][gate_x] = MT_GATE;
+	set_metatile16(gate_x, gate_y, MTL_GATE_CLOSED);
+    
+    // Reset key status
+    has_key = 0;
+
+    // Place obstacles
+    place_obstacles();
+    
+    // Initialize enemies BEFORE placing player
+    init_enemies();
+    
+    // Place player at start LAST
+    player_x = 0;
+    player_y = 0;
+    room[player_y][player_x] = MT_PLAYER;
+    set_metatile16(player_x, player_y, MTL_PLAYER_FRONT_S);
+    
+    draw_status_bar();
+}
+
+
+void init_enemies(void) {
+    UINT8 i;
+    num_enemies = 0;
+    
+    // Clear enemy array
+    for(i = 0; i < MAX_ENEMIES; i++) {
+        enemies[i].active = 0;
+    }
+
+    // Calculate number of enemies based on level
+    UINT8 min_enemies = 1;
+    UINT8 max_enemies = 4;
+    
+    if(level >= 10) {
+        min_enemies = 2;
+        max_enemies = 5;
+    }
+    if(level >= 20) {
+        min_enemies = 2;
+        max_enemies = 6;
+    }
+    if(level >= 30) {
+        min_enemies = 3;
+        max_enemies = 7;
+    }
+
+    num_enemies = min_enemies + (randw() % (max_enemies - min_enemies + 1));
+
+    // Place enemies
+    for(i = 0; i < num_enemies; i++) {
+        UINT8 enemy_x, enemy_y;
+        do {
+            enemy_x = 2 + (randw() % (ROOM_WIDTH-3));  // Start from x=2 to avoid player area
+            enemy_y = 1 + (randw() % (ROOM_HEIGHT-2));
+        } while(room[enemy_y][enemy_x] != MT_FLOOR || 
+               (enemy_x <= 1 && enemy_y <= 1));  // Keep away from player start
+
+        enemies[i].x = enemy_x;
+        enemies[i].y = enemy_y;
+        enemies[i].type = randw() % ENEMY_TYPES;
+        enemies[i].active = 1;
+        
+UINT8 base_hp = 0;
+switch(enemies[i].type) {
+    case ENEMY_TYPE_X:
+        base_hp = ENEMY_BASE_HP_X;  // 2
+        break;
+    case ENEMY_TYPE_Y:
+        base_hp = ENEMY_BASE_HP_Y;  // 3
+        break;
+    case ENEMY_TYPE_Z:
+        base_hp = ENEMY_BASE_HP_Z;  // 4
+        break;
+}
+
+// Cap level bonus to prevent enemies from becoming too tough
+UINT8 level_bonus = (level / 10);
+if(level_bonus > 3) level_bonus = 3;  // Cap at +3 HP from levels
+
+enemies[i].hp = base_hp + level_bonus;
+
+        // Mark enemy position in room
+        room[enemy_y][enemy_x] = MT_ENEMY_X + enemies[i].type;
+        set_metatile16(enemy_x, enemy_y, MTL_ENEMY_X + enemies[i].type);
+    }
+}
+
+
+
+void draw_room(void) {
+    UINT8 x, y;
+    
+    for(y = 0; y < ROOM_HEIGHT; y++) {
+        for(x = 0; x < ROOM_WIDTH; x++) {
+            if(room[y][x] == MT_PLAYER || (room[y][x] >= MT_ENEMY_X && room[y][x] <= MT_ENEMY_Z)) {
+                // Skip player and enemy positions - we'll draw these last
+                set_metatile16(x, y, MTL_FLOOR);
+            } else {
+                // Map MT_ values to MTL_ values
+                switch(room[y][x]) {
+                    case MT_FLOOR:
+                        set_metatile16(x, y, MTL_FLOOR);
+                        break;
+                    case MT_OBSTACLE:
+                        set_metatile16(x, y, MTL_WALL1);
+                        break;
+                    case MT_KEY:
+                        set_metatile16(x, y, MTL_KEY);
+                        break;
+                    case MT_GATE:
+                        set_metatile16(x, y, has_key ? MTL_GATE_OPEN : MTL_GATE_CLOSED);
+                        break;
+                }
+            }
+        }
+    }
+    
+    // Draw enemies
+    for(UINT8 i = 0; i < MAX_ENEMIES; i++) {
+        if(enemies[i].active) {
+            set_metatile16(enemies[i].x, enemies[i].y, MTL_ENEMY_X + enemies[i].type);
+        }
+    }
+    
+    // Draw player
+    room[player_y][player_x] = MT_PLAYER;
+    set_metatile16(player_x, player_y, MTL_PLAYER_FRONT_S);
+    
+    draw_status_bar();
+}
+
+void movePlayer(INT8 dx, INT8 dy) {
+    // Update player direction based on movement
+    if(dx < 0) player_anim.direction = 2;      // Left
+    else if(dx > 0) player_anim.direction = 3;  // Right
+    else if(dy < 0) player_anim.direction = 1;  // Back
+    else if(dy > 0) player_anim.direction = 0;  // Front
+
+    // Handle bounds checking
+    if ((dx < 0 && player_x == 0) || (dy < 0 && player_y == 0)) return;
+    
+    UINT8 new_x = player_x + dx;
+    UINT8 new_y = player_y + dy;
+    
+    if (new_x >= ROOM_WIDTH || new_y >= ROOM_HEIGHT) return;
+    
+    // Check if we're trying to move into an enemy
+    UINT8 is_enemy = 0;
+    for(UINT8 i = 0; i < MAX_ENEMIES; i++) {
+        if(enemies[i].active && 
+           enemies[i].x == new_x && 
+           enemies[i].y == new_y) {
+            is_enemy = 1;
+            handle_combat(new_x, new_y);
+            return;
+        }
+    }
+    
+    // If it's an enemy tile but no active enemy was found, clear it
+    if(room[new_y][new_x] >= MT_ENEMY_X && 
+       room[new_y][new_x] <= MT_ENEMY_Z && 
+       !is_enemy) {
+        room[new_y][new_x] = MT_FLOOR;  // Logical update
+        set_metatile16(new_x, new_y, MTL_FLOOR); // Visual update
+    }
+    
+    // Handle tile movement
+    switch(room[new_y][new_x]) {
+        case MT_FLOOR:
+            room[player_y][player_x] = MT_FLOOR;
+            set_metatile16(player_x, player_y, MTL_FLOOR);
+            player_x = new_x;
+            player_y = new_y;
+            room[player_y][player_x] = MT_PLAYER;
+            
+            // Update animation and draw correct frame
+            update_player_animation(&player_anim, 1);  // 1 = moving
+            set_metatile16(player_x, player_y, get_player_tile(&player_anim));
+
+            move_delay = MOVE_SPEED;
+            move_enemies();
+            break;
+            
+        case MT_KEY:
+            if(!has_key) {
+                play_key_pickup();
+                room[player_y][player_x] = MT_FLOOR;
+                set_metatile16(player_x, player_y, MTL_FLOOR);
+                player_x = new_x;
+                player_y = new_y;
+                room[player_y][player_x] = MT_PLAYER;
+                
+                update_player_animation(&player_anim, 1);
+                set_metatile16(player_x, player_y, get_player_tile(&player_anim));
+                
+                has_key = 1;
+                draw_status_bar();
+                move_delay = MOVE_SPEED;
+                move_enemies();
+            }
+            break;
+            
+        case MT_GATE:
+            if(has_key) {
+                in_quiz_mode = 1;
+                start_quiz_mode();
+            }
+            break;
+            
+        case MT_OBSTACLE:
+            break;
+            
+        default:
+            break;
+    }
+}
+
+void handle_quiz_input(UINT8 joy) {
+    static UINT8 last_joy = 0;
+    if(joy == last_joy) return;
+    last_joy = joy;
+    
+    if(joy & J_UP) {
+        play_arpeggio(current_chord);
+        return;
+    }
+
+    ChordType chosen = CHORD_MAJOR;
+    if(joy & J_LEFT) chosen = CHORD_MAJOR;
+    else if(joy & J_DOWN) chosen = CHORD_MINOR;
+    else if(joy & J_RIGHT) chosen = CHORD_MAJOR7;  // Changed from CHORD_SEVENTH
+    else return;
+
+    if(chosen == current_chord) {
+        level++;
+        in_quiz_mode = 0;
+        init_room();
+    } else {
+        in_quiz_mode = 0;
+        init_room();
+    }
+}
+
+void draw_quiz_screen(void) {
+    // First clear the entire screen with spaces
+    fill_bkg_rect(0, 0, 20, 18, char_to_tile[' ']);
+    
+    // Draw musical border (16x16 pattern)
+    // Top and bottom borders - full width, 2 tiles tall
+    for(UINT8 x = 0; x < 20; x += 2) {
+        // Top border - 2 tiles tall
+        set_bkg_tile_xy(x, 0, 114);     // Top row, first tile
+        set_bkg_tile_xy(x+1, 0, 114);   // Top row, second tile
+        set_bkg_tile_xy(x, 1, 114);     // Second row, first tile
+        set_bkg_tile_xy(x+1, 1, 114);   // Second row, second tile
+        
+        // Bottom border - 2 tiles tall
+        set_bkg_tile_xy(x, 16, 114);    // Bottom row - 2 from bottom
+        set_bkg_tile_xy(x+1, 16, 114);  // Complete the pattern
+        set_bkg_tile_xy(x, 17, 114);    // Bottom row
+        set_bkg_tile_xy(x+1, 17, 114);  // Complete the pattern
+    }
+    
+    // Left and right borders - single tile wide, connecting top and bottom
+    for(UINT8 y = 2; y < 16; y += 2) {
+        set_bkg_tile_xy(0, y, 114);     // Left border
+        set_bkg_tile_xy(0, y+1, 114);   // Complete the pattern
+        set_bkg_tile_xy(19, y, 114);    // Right border
+        set_bkg_tile_xy(19, y+1, 114);  // Complete the pattern
+    }
+    
+    // Calculate center position for quiz elements
+    UINT8 centerX = 10;
+    UINT8 centerY = 9;
+    
+    // Draw quiz interface centered within border
+    // Up arrow (98) for Replay
+    set_bkg_tile_xy(centerX, centerY-3, 98);
+    draw_text(centerX-3, centerY-4, "REPLAY");
+    
+    // Left arrow (100) for Major
+    set_bkg_tile_xy(centerX-3, centerY, 100);
+    draw_text(centerX-6, centerY, "MAJ");
+    
+    // Right arrow (101) for Seventh
+    set_bkg_tile_xy(centerX+3, centerY, 101);
+    draw_text(centerX+4, centerY, "7TH");
+    
+    // Down arrow (99) for Minor
+    set_bkg_tile_xy(centerX, centerY+3, 99);
+    draw_text(centerX-2, centerY+4, "MIN");
+}
+
+void draw_game_over_screen(void) {
+    // First clear the entire screen with spaces
+    fill_bkg_rect(0, 0, 20, 18, char_to_tile[' ']);
+    
+    // Draw border using MUSIC5 (114) like in quiz screen
+    // Top and bottom borders - full width, 2 tiles tall
+    for(UINT8 x = 0; x < 20; x += 2) {
+        // Top border - 2 tiles tall
+        set_bkg_tile_xy(x, 0, 114);
+        set_bkg_tile_xy(x+1, 0, 114);
+        set_bkg_tile_xy(x, 1, 114);
+        set_bkg_tile_xy(x+1, 1, 114);
+        
+        // Bottom border - 2 tiles tall
+        set_bkg_tile_xy(x, 16, 114);
+        set_bkg_tile_xy(x+1, 16, 114);
+        set_bkg_tile_xy(x, 17, 114);
+        set_bkg_tile_xy(x+1, 17, 114);
+    }
+    
+    // Left and right borders - single tile wide
+    for(UINT8 y = 2; y < 16; y += 2) {
+        set_bkg_tile_xy(0, y, 114);
+        set_bkg_tile_xy(0, y+1, 114);
+        set_bkg_tile_xy(19, y, 114);
+        set_bkg_tile_xy(19, y+1, 114);
+    }
+    
+    // Draw "GAME OVER" text centered
+    draw_text(6, 6, "GAME OVER");
+    
+    // Show final level
+    draw_text(4, 8, "FINAL LEVEL:");
+    if(level < 10) {
+        UINT8 level_char = (UINT8)('0' + level);
+        set_bkg_tile_xy(15, 8, char_to_tile[level_char]);
+    } else {
+        UINT8 tens = (UINT8)('0' + (level / 10));
+        UINT8 ones = (UINT8)('0' + (level % 10));
+        set_bkg_tile_xy(15, 8, char_to_tile[tens]);
+        set_bkg_tile_xy(16, 8, char_to_tile[ones]);
+    }
+    
+    // Press Start to continue
+    draw_text(3, 12, "PRESS START");
+    draw_text(4, 13, "TO RESTART");
+}
+
+void handle_player_death(void) {
+    if(player_hp <= 0) {
+        play_death_sound();
+        stop_background_music();
+        in_game_over = 1;
+        draw_game_over_screen();
+    }
+}
+
+
+
+void main(void) {
+    // Initialize random seed
+    initrand(DIV_REG);
+    
+    // Set up display
+    BGP_REG = 0xE4;
+    SHOW_BKG;
+    DISPLAY_ON;
+    init_graphics();  
+    init_sound();
+    
+    // Start in menu
+    draw_menu_screen();
+    
+    // Game loop
+    while(1) {
+		        if(!in_menu && !in_quiz_mode && !in_game_over) {
+            if(move_delay == 0) {
+                // Update animation to standing frame when not moving
+                update_player_animation(&player_anim, 0);  // 0 = not moving
+                set_metatile16(player_x, player_y, get_player_tile(&player_anim));
+            }
+        }
+        if(in_menu) {
+            handle_menu_input(joypad());
+        } else {
+            update_background_music();
+            
+            if(move_delay == 0) {
+                UINT8 joy = joypad();
+                
+                if(in_game_over) {
+                    if(joy & J_START) {
+                        // Reset game state
+                        in_game_over = 0;
+                        level = 1;
+                        player_hp = max_hp;
+                        player_xp = 0;
+                        attack_level = 1;
+                        defense_level = 1;
+                        start_background_music();
+                        init_room();
+                        draw_room();
+                    }
+                }
+                else if(in_quiz_mode) {
+                    handle_quiz_input(joy);
+                } else {
+                    // Check for death after any damage is taken
+                    if(player_hp <= 0) {
+                        handle_player_death();
+                        continue;
+                    }
+                    
+                    if(joy & J_LEFT) {
+                        movePlayer(-1, 0);
+                    }
+                    else if(joy & J_RIGHT) {
+                        movePlayer(1, 0);
+                    }
+                    else if(joy & J_UP) {
+                        movePlayer(0, -1);
+                    }
+                    else if(joy & J_DOWN) {
+                        movePlayer(0, 1);
+                    }
+                }
+            } else {
+                move_delay--;
+            }
+        }
+        wait_vbl_done();
+    }
+}

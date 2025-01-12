@@ -1,0 +1,63 @@
+#include "sound_data.h"
+#include "hUGEDriver.h"
+
+void init_sound(void) {
+    // Initialize hUGEDriver
+    __critical {
+        hUGE_init(&chord_major_data);
+        hUGE_mute(MUTE_CHANNELS);
+    }
+}
+
+void play_chord(ChordType type) {
+    switch(type) {
+        case CHORD_MAJOR:
+            SWITCH_ROM_MBC1(BANK_CHORDS);
+            hUGE_init(&chord_major_data);
+            break;
+        case CHORD_MINOR:
+            SWITCH_ROM_MBC1(BANK_CHORDS);
+            hUGE_init(&chord_minor_data);
+            break;
+        case CHORD_SEVENTH:
+            SWITCH_ROM_MBC1(BANK_CHORDS);
+            hUGE_init(&chord_seventh_data);
+            break;
+    }
+    
+    // Play for a short duration
+    hUGE_mute(UNMUTE_CHANNELS);
+    delay(500);
+    hUGE_mute(MUTE_CHANNELS);
+}
+
+void play_arpeggio(ChordType type) {
+    // Similar to play_chord but with arpeggio pattern
+    play_chord(type);
+}
+
+void play_hit_sound(void) {
+    // Simple sound effect using pulse channel
+    NR10_REG = 0x1E;
+    NR11_REG = 0x80;
+    NR12_REG = 0xF1;
+    NR13_REG = 0xFF;
+    NR14_REG = 0x86;
+}
+
+void play_key_pickup(void) {
+    // Two-tone pickup sound
+    NR21_REG = 0x40;
+    NR22_REG = 0xF3;
+    NR23_REG = 0x73;
+    NR24_REG = 0x86;
+    delay(40);
+    NR21_REG = 0x40;
+    NR22_REG = 0xF3;
+    NR23_REG = 0x58;
+    NR24_REG = 0x86;
+}
+
+void stop_sound(void) {
+    hUGE_mute(MUTE_CHANNELS);
+}
