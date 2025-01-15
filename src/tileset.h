@@ -3,33 +3,24 @@
 
 #include <gb/gb.h>
 #include "globals.h"
+#include "game_types.h"
 
 // Core dimensions
 #define METATILE_SIZE 16  // 16x16 pixels
-#define ROOM_WIDTH 10     // 8 playable + 2 wall tiles
-#define ROOM_HEIGHT 8     // 6 playable + 2 wall tiles
 
-// Basic tile types (only what we need now)
-#define MT_FLOOR        0    // Empty floor
-#define MT_WALL         1    // Basic wall
-#define MT_OBSTACLE     8    // Obstacles
+// Multi-tile definitions (matching multi.png)
+#define MTL_BLOCK          0   // Block obstacle
+#define MTL_FLOOR          1   // Basic floor
+#define MTL_WALL           2   // Wall (replaced POWERUP)
+#define MTL_ENEMY_X        3   // Enemy type X
+#define MTL_ENEMY_Y        4   // Enemy type Y
+#define MTL_ENEMY_Z        5   // Enemy type Z
+#define MTL_GATE_CLOSED    6   // Gate (closed)
+#define MTL_GATE_OPEN      7   // Gate (open)
+#define MTL_KEY            8   // Key
+#define MTL_HEART          9   // Heart
 
-// Game tile IDs
-#define GAME_TILE_OFFSET   128u
-#define TILE_FLOOR         (GAME_TILE_OFFSET + 0u)
-#define TILE_WALL_TL       (GAME_TILE_OFFSET + 1u)
-#define TILE_KEY           (GAME_TILE_OFFSET + 2u)
-#define TILE_GATE          (GAME_TILE_OFFSET + 3u)
-#define TILE_OBSTACLE      (GAME_TILE_OFFSET + 7u)
-
-#define TILE_STAR 96u  // Tile ID for star symbol (after ? symbol)
-
-// MetaTile definitions
-#define MTL_WALL1            0  // Outer walls
-#define MTL_FLOOR           1
-#define MTL_OBSTACLE       30  // Obstacles
-
-// Player animations
+// Player animation frames (10-19)
 #define MTL_PLAYER_FRONT_L    10
 #define MTL_PLAYER_FRONT_S    11
 #define MTL_PLAYER_FRONT_R    12
@@ -41,8 +32,21 @@
 #define MTL_PLAYER_RIGHT_S    18
 #define MTL_PLAYER_RIGHT_W    19
 
-// Special characters
+// Big numbers and special tiles (20-29)
+#define MTL_NUMBER_1       20
+#define MTL_NUMBER_2       21
+#define MTL_NUMBER_3       22
+#define MTL_NUMBER_4       23
+#define MTL_NUMBER_5       24
+#define MTL_NUMBER_6       25
+#define MTL_NUMBER_7       26
+#define MTL_NUMBER_Q       27
+#define MTL_PIT           28
+#define MTL_CRACK         29
+
+// Special tiles
 #define TILE_MUSICNOTE     95u
+#define TILE_STAR          96u
 
 // MetaTile structures
 typedef struct {
@@ -62,13 +66,12 @@ typedef struct {
 
 // Function declarations
 void set_metatile16(UINT8 x, UINT8 y, UINT8 metatile_id);
-void draw_text(UINT8 x, UINT8 y, const char *text);
-void draw_special_tile(UINT8 x, UINT8 y, UINT8 tile);
 
 // External data declarations
 extern const UINT8 TILESET[];
-extern const unsigned char char_to_tile[];
+extern const MetaTile16 metatiles16[];
+extern const MetaTile metatiles[];
 extern const unsigned char game_tiles[];
-extern const unsigned char multi_tiles[]; 
+extern const unsigned char multi_tiles[];
 
 #endif

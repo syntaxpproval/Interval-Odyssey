@@ -2,8 +2,12 @@
 #define __GLOBALS_H
 
 #include <gb/gb.h>
+#include "game_types.h"
+#include "room_manager.h"
 
-extern UINT8 player_x;  // Declare as external
-extern UINT8 player_y;
+extern Level current_level;
+extern Room* current_room;
+extern UINT8 current_stage;
+extern UINT8 can_use_exit;
 
 #endif

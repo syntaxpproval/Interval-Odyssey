@@ -1,211 +1,125 @@
 #include "room_templates.h"
 #include <string.h>
 
-// Base room templates
+// Base room templates with proper initialization
 const UINT8 base_room_templates[NUM_BASE_TEMPLATES][ROOM_HEIGHT][ROOM_WIDTH] = {
-    // Template 0: Staging room (unique design with centered open area)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,8,8,0,0,8,8,0,1},
-    {1,0,8,0,0,0,0,8,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,8,0,0,0,0,8,0,1},
-    {1,0,8,8,0,0,8,8,0,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 1: Combat/Key/Gate variation 1 (corner obstacles)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,8,0,0,0,0,8,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,8,0,0,0,0,8,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 2: Combat/Key/Gate variation 2 (cross pattern)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,0,0,0,8,8,0,0,0,1},
-    {1,0,0,0,8,8,0,0,0,1},
-    {1,0,8,8,8,8,8,8,0,1},
-    {1,0,8,8,8,8,8,8,0,1},
-    {1,0,0,0,8,8,0,0,0,1},
-    {1,0,0,0,8,8,0,0,0,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 3: Combat/Key/Gate variation 3 (diagonal barriers)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,8,0,0,0,0,8,0,1},
-    {1,0,0,8,0,0,8,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,8,0,0,8,0,0,1},
-    {1,0,8,0,0,0,0,8,0,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 4: Combat/Key/Gate variation 4 (diamond pattern)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,0,0,0,8,8,0,0,0,1},
-    {1,0,0,8,0,0,8,0,0,1},
-    {1,0,8,0,0,0,0,8,0,1},
-    {1,0,8,0,0,0,0,8,0,1},
-    {1,0,0,8,0,0,8,0,0,1},
-    {1,0,0,0,8,8,0,0,0,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 5: Combat/Key/Gate variation 5 (side barriers)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 6: Combat/Key/Gate variation 6 (checkerboard)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 7: Combat/Key/Gate variation 7 (central square)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,8,8,8,8,0,0,1},
-    {1,0,0,8,0,0,8,0,0,1},
-    {1,0,0,8,0,0,8,0,0,1},
-    {1,0,0,8,8,8,8,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 8: Combat/Key/Gate variation 8 (H pattern)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,8,8,8,8,8,8,0,1},
-    {1,0,8,8,8,8,8,8,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 9: Combat/Key/Gate variation 9 (zig-zag)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,8,8,0,0,0,0,0,1},
-    {1,0,0,8,8,8,0,0,0,1},
-    {1,0,0,0,0,8,8,8,0,1},
-    {1,0,0,0,0,0,0,8,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 10: Combat/Key/Gate variation 10 (plus sign)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,0,0,0,8,8,0,0,0,1},
-    {1,0,0,0,8,8,0,0,0,1},
-    {1,0,8,8,8,8,8,8,0,1},
-    {1,0,8,8,8,8,8,8,0,1},
-    {1,0,0,0,8,8,0,0,0,1},
-    {1,0,0,0,8,8,0,0,0,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 11: Corridor (long horizontal passage)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,8,8,8,8,8,8,8,8,1},
-    {1,8,8,8,0,0,8,8,8,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,8,8,8,0,0,8,8,8,1},
-    {1,8,8,8,8,8,8,8,8,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 12: Bonus room (open with decorative corners)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,8,8,0,0,0,0,8,8,1},
-    {1,8,0,0,0,0,0,0,8,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,8,0,0,0,0,0,0,8,1},
-    {1,8,8,0,0,0,0,8,8,1},
-    {1,1,1,1,1,1,1,1,1,1}
-},
-
-// Template 13: Base empty room (for any other needs)
-{
-    {1,1,1,1,1,1,1,1,1,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,0,0,0,0,0,0,0,0,1},
-    {1,1,1,1,1,1,1,1,1,1}
-}
+    // Template 0: Simple open room with just walls and floor
+    {
+        {2,2,2,2,2,2,2,2,2,2},
+        {2,1,1,1,1,1,1,0,1,2},
+        {2,1,1,1,1,1,1,1,1,2},
+        {2,1,1,1,1,1,1,1,1,2},
+        {2,1,1,1,1,1,1,1,1,2},
+        {2,1,1,1,1,1,1,1,1,2},
+        {2,1,29,1,1,1,1,28,1,2},
+        {2,2,2,2,2,2,2,2,2,2}
+    },
+    // Template 1: Pit hazards room
+    {
+        {2,2,2,2,2,2,2,2,2,2},
+        {2,1,1,1,1,1,28,1,1,2},
+        {2,1,1,1,1,1,1,1,1,2},
+        {2,28,1,1,1,1,1,1,28,2},
+        {2,1,1,1,1,1,1,1,1,2},
+        {2,28,1,1,1,1,1,1,28,2},
+        {2,1,1,1,1,1,1,1,1,2},
+        {2,2,2,2,2,2,2,2,2,2}
+    },
+    // Template 2: Obstacle course with blocks and cracked floors
+    {
+        {2,2,2,2,2,2,2,2,2,2},
+        {2,1,1,1,1,1,1,1,1,2},
+        {2,1,1,29,1,1,29,1,1,2},
+        {2,1,29,1,0,0,1,29,1,2},
+        {2,1,1,1,1,1,1,1,1,2},
+        {2,1,29,1,0,1,1,29,1,2},
+        {2,1,1,29,1,1,29,1,1,2},
+        {2,2,2,2,2,2,2,2,2,2}
+    }
 };
 
-const StageTemplate stage1_template = {
-    11,  // num_rooms
+const LevelTemplate stage1_template = {
+    11,  // num_rooms (orientation N,E,S,W clockwise)
     {
-        // Staging room (ID:0, Type:STAGING)
-        {3, -1, -1, -1, 0, ROOM_TYPE_STAGING},
+        // Room ID: 0 - Staging Room (Starting Point)
+        {0, ROOM_TYPE_STAGING, 3, -1, -1, -1},
         
-        // Key room left (ID:1, Type:KEY)
-        {-1, -1, 2, -1, 1, ROOM_TYPE_KEY},
+        // Room ID: 1 - Key Room Left
+        {1, ROOM_TYPE_KEY, -1, 2, -1, -1},
 
-        // Combat room (ID:2, Type:COMBAT)
-        {-1, 3, 6, 1, 2, ROOM_TYPE_COMBAT},
+        // Room ID: 2 - Combat Room
+        {1, ROOM_TYPE_COMBAT, -1, 6, 3, 1},
 
-        // Combat room vertical (ID:3, Type:COMBAT)
-        {2, 0, -1, -1, 3, ROOM_TYPE_COMBAT},
+        // Room ID: 3 - Combat Room Vertical
+        {1, ROOM_TYPE_COMBAT, 2, -1, 0, -1},
 
-        // Gate room (ID:4, Type:GATE)
-        {-1, 5, -1, -1, 4, ROOM_TYPE_GATE},
+        // Room ID: 4 - Gate Room
+        {2, ROOM_TYPE_GATE, -1, -1, 5, -1},
 
-        // Combat room upper (ID:5, Type:COMBAT)
-        {4, 6, -1, -1, 5, ROOM_TYPE_COMBAT},
+        // Room ID: 5 - Combat Room Upper
+        {1, ROOM_TYPE_COMBAT, 4, -1, 6, -1},
 
-        // Combat room center (ID:6, Type:COMBAT)
-        {5, 7, 8, 2, 6, ROOM_TYPE_COMBAT},
+        // Room ID: 6 - Combat Room Center
+        {1, ROOM_TYPE_COMBAT, 5, 8, 7, 2},
 
-        // Bonus room (ID:7, Type:BONUS)
-        {6, -1, -1, -1, 7, ROOM_TYPE_BONUS},
+        // Room ID: 7 - Bonus Room
+        {1, ROOM_TYPE_BONUS, 6, -1, -1, -1},
 
-        // Combat room right (ID:8, Type:COMBAT)
-        {-1, -1, 9, 6, 8, ROOM_TYPE_COMBAT},
+        // Room ID: 8 - Combat Room Right
+        {1, ROOM_TYPE_COMBAT, -1, 9, -1, 6},
 
-        // Corridor (ID:9, Type:CORRIDOR)
-        {-1, -1, 10, 8, 9, ROOM_TYPE_CORRIDOR},
+        // Room ID: 9 - Corridor
+        {1, ROOM_TYPE_CORRIDOR, -1, 10, -1, 8},
 
-        // Key room right (ID:10, Type:KEY)
-        {-1, -1, -1, 9, 10, ROOM_TYPE_KEY}
+        // Room ID: 10 - Key Room Right
+        {1, ROOM_TYPE_KEY, -1, -1, -1, 9}
+    }
+};
+
+// Stage 2 template - More challenging version
+const LevelTemplate stage2_template = {
+    14,  // num_rooms
+    {
+        // Room ID: 0 - Staging Room (Starting Point)
+        {0, ROOM_TYPE_STAGING, 4, -1, -1, -1},
+        
+        // Room ID: 1 - Combat Room
+        {1, ROOM_TYPE_COMBAT, -1, 5, 2, -1},
+
+        // Room ID: 2 - Combat Room
+        {1, ROOM_TYPE_COMBAT, 1, -1, 3, -1},
+
+        // Room ID: 3 - Combat Room
+        {1, ROOM_TYPE_COMBAT, 2, -1, 4, -1},
+
+        // Room ID: 4 - Combat Room
+        {1, ROOM_TYPE_COMBAT, 3, -1, 0, -1},
+
+        // Room ID: 5 - Corridor
+        {1, ROOM_TYPE_CORRIDOR, -1, 6, -1, 1},
+
+        // Room ID: 6 - Combat Room
+        {1, ROOM_TYPE_COMBAT, -1, 9, 7, 5},
+
+        // Room ID: 7 - Combat Room
+        {1, ROOM_TYPE_COMBAT, 6, -1, 8, -1},
+
+        // Room ID: 8 - Key Room
+        {1, ROOM_TYPE_KEY, 7, -1, -1, -1},
+
+        // Room ID: 9 - Combat Room
+        {1, ROOM_TYPE_COMBAT, -1, 10, -1, 6},
+
+        // Room ID: 10 - Combat Room
+        {1, ROOM_TYPE_COMBAT, -1, 13, 11, 9},
+
+        // Room ID: 11 - Combat Room
+        {1, ROOM_TYPE_COMBAT, 10, -1, 12, -1},
+
+        // Room ID: 12 - Gate Room
+        {2, ROOM_TYPE_GATE, 11, -1, -1, -1},
+
+        // Room ID: 13 - Bonus Room
+        {1, ROOM_TYPE_BONUS, -1, -1, -1, 10}
     }
 };

@@ -1,26 +1,5 @@
 #include "tileset.h"
 
-// Individual tile arrays for metatiles
-const UINT8 floor_tiles[4] = {TILE_FLOOR, TILE_FLOOR, TILE_FLOOR, TILE_FLOOR};
-const UINT8 wall_tiles[4] = {TILE_WALL_TL, TILE_WALL_TL, TILE_WALL_TL, TILE_WALL_TL};
-const UINT8 key_tiles[4] = {TILE_KEY, TILE_KEY, TILE_KEY, TILE_KEY};
-const UINT8 gate_tiles[4] = {TILE_GATE, TILE_GATE, TILE_GATE, TILE_GATE};
-const UINT8 player_tiles[4] = {TILE_WALL_TL, TILE_WALL_TL, TILE_WALL_TL, TILE_WALL_TL};
-
-
-const MetaTile metatiles[] = {
-    {.tiles = {TILE_FLOOR, TILE_FLOOR, TILE_FLOOR, TILE_FLOOR}, .walkable = 1, .destructible = 0},  // MT_FLOOR
-    {.tiles = {TILE_WALL_TL, TILE_WALL_TL, TILE_WALL_TL, TILE_WALL_TL}, .walkable = 0, .destructible = 0},  // MT_WALL
-    {.tiles = {TILE_KEY, TILE_KEY, TILE_KEY, TILE_KEY}, .walkable = 1, .destructible = 0},  // MT_KEY
-    {.tiles = {TILE_GATE, TILE_GATE, TILE_GATE, TILE_GATE}, .walkable = 0, .destructible = 0},  // MT_GATE
-    {.tiles = {TILE_WALL_TL, TILE_WALL_TL, TILE_WALL_TL, TILE_WALL_TL}, .walkable = 1, .destructible = 0},   // MT_PLAYER
-    {.tiles = {GAME_TILE_OFFSET + 4, GAME_TILE_OFFSET + 4, GAME_TILE_OFFSET + 4, GAME_TILE_OFFSET + 4}, .walkable = 0, .destructible = 1},  // MT_ENEMY_X
-    {.tiles = {GAME_TILE_OFFSET + 5, GAME_TILE_OFFSET + 5, GAME_TILE_OFFSET + 5, GAME_TILE_OFFSET + 5}, .walkable = 0, .destructible = 1},  // MT_ENEMY_Y
-    {.tiles = {GAME_TILE_OFFSET + 6, GAME_TILE_OFFSET + 6, GAME_TILE_OFFSET + 6, GAME_TILE_OFFSET + 6}, .walkable = 0, .destructible = 1},   // MT_ENEMY_Z
-    {.tiles = {TILE_OBSTACLE, TILE_OBSTACLE, TILE_OBSTACLE, TILE_OBSTACLE}, .walkable = 0, .destructible = 0}  // MT_OBSTACLE
-};
-
-// Font tileset (your existing converted font data goes here)
 const UINT8 TILESET[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x00, 0x00, 0x10, 0x10, 0x00, 0x00,
@@ -134,7 +113,7 @@ const UINT8 TILESET[] = {
     0x00, 0x00, 0xFE, 0xFE, 0x91, 0x91, 0xBB, 0xBB, 0xBB, 0xBB, 0x9B, 0x9B, 0xFE, 0xFE, 0x00, 0x00,
     0x30, 0x30, 0x48, 0x48, 0x48, 0x48, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0xFC, 0x00, 0x00,
     0x0C, 0x0C, 0x12, 0x12, 0x12, 0x12, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0x00, 0x00,
-    0x18, 0x18, 0x14, 0x14, 0x18, 0x18, 0x14, 0x14, 0x10, 0x10, 0x30, 0x30, 0x30, 0x30, 0x00, 0x00,
+    0xFF, 0xFF, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0xFF, 0xFF,
     0x38, 0x38, 0x26, 0x26, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x62, 0x62, 0x66, 0x66, 0x06, 0x06,
     0x0E, 0x0E, 0x3E, 0x3E, 0x32, 0x32, 0x22, 0x22, 0x22, 0x22, 0x26, 0x26, 0x66, 0x66, 0x60, 0x60,
     0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x30, 0x30, 0x50, 0x50, 0x60, 0x60, 0x00, 0x00,
@@ -144,196 +123,114 @@ const UINT8 TILESET[] = {
     0x54, 0x54, 0x54, 0x54, 0x54, 0x54, 0x54, 0x54, 0x54, 0x54, 0x48, 0x48, 0x48, 0x48, 0x00, 0x00,
     0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x28, 0x28, 0x28, 0x28, 0x10, 0x10, 0x10, 0x10, 0x00, 0x00,
     0x00, 0x00, 0x10, 0x10, 0x2C, 0x2C, 0x42, 0x42, 0x56, 0x42, 0x3C, 0x24, 0x18, 0x18, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x18, 0x00, 0x24, 0x00, 0x42, 0x00, 0x42, 0x00, 0x24, 0x00, 0x18, 0x00, 0x00, 0x00,
+    0x18, 0x00, 0x42, 0x00, 0x00, 0x00, 0x81, 0x00, 0x81, 0x00, 0x00, 0x00, 0x42, 0x00, 0x18, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x24, 0x24, 0x18, 0x18, 0x18, 0x18, 0x24, 0x24, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x42, 0x42, 0x24, 0x24, 0x00, 0x00, 0x00, 0x00, 0x24, 0x24, 0x42, 0x42, 0x00, 0x00,
     0x81, 0x81, 0x42, 0x42, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, 0x42, 0x81, 0x81,
 };
 
-// Character to tile mapping
-const unsigned char char_to_tile[] = {
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 0x00-0x0F
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 0x10-0x1F
-    0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, // 0x20-0x2F
-    16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, // 0x30-0x3F
-    32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, // 0x40-0x4F
-    48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, // 0x50-0x5F
-    64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, // 0x60-0x6F
-    80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95  // 0x70-0x7F
-};
 
-const unsigned char game_tiles[] = {
-    // TILE 0: Floor (completely blank)
-    0x00, 0x00,
-    0x00, 0x00,
-    0x00, 0x00,
-    0x00, 0x00,
-    0x00, 0x00,
-    0x00, 0x00,
-    0x00, 0x00,
-    0x00, 0x00,
-
-    // TILE 1: Wall (solid black)
-    0xFF, 0xFF,
-    0xFF, 0xFF,
-    0xFF, 0xFF,
-    0xFF, 0xFF,
-    0xFF, 0xFF,
-    0xFF, 0xFF,
-    0xFF, 0xFF,
-    0xFF, 0xFF,
-
-    // TILE 2: Key
-    0x00, 0x00,
-    0x18, 0x00,
-    0x24, 0x00,
-    0x24, 0x00,
-    0x18, 0x00,
-    0x08, 0x00,
-    0x1C, 0x00,
-    0x08, 0x00,
-
-    // TILE 3: Gate
-    0xFF, 0xFF,
-    0x81, 0x81,
-    0xBD, 0xBD,
-    0xBD, 0xBD,
-    0xBD, 0xBD,
-    0xBD, 0xBD,
-    0x81, 0x81,
-    0xFF, 0xFF,
-	
-// TILE 4: Enemy X
-0x00, 0x00,
-0x00, 0x42,
-0x00, 0x24,
-0x00, 0x18,
-0x00, 0x18,
-0x00, 0x24,
-0x00, 0x42,
-0x00, 0x00,
-
-// TILE 5: Enemy Y
-0x00, 0x00,
-0x00, 0x24,
-0x00, 0x24,
-0x00, 0x18,
-0x00, 0x18,
-0x00, 0x3C,
-0x00, 0x24,
-0x00, 0x00,
-
-// TILE 6: Enemy Z
-0x00, 0x00,
-0x00, 0x7E,
-0x00, 0x02,
-0x00, 0x1C,
-0x00, 0x30,
-0x00, 0x40,
-0x00, 0x7E,
-0x00, 0x00,
-
-    0xFF, 0xFF,
-    0xFF, 0x81,
-    0xFF, 0xBD,
-    0xFF, 0xA5,
-    0xFF, 0xA5,
-    0xFF, 0xBD,
-    0xFF, 0x81,
-    0xFF, 0xFF
-};
-
-#include "tileset.h"
-
+// Updated metatile definitions using multi_tiles offsets
 const MetaTile16 metatiles16[] = {
-    // WALL1 (using music note tile 114 for all four positions)
-    {114, 114,    // Top row (left, right)
-     114, 114,    // Bottom row (left, right)
-     0, 0},       // walkable and destructible flags
+    // Block (ID: 0)
+    {
+        136, 137,
+        156, 157,
+        0, 0
+    },
     
-    // FLOOR
-    {138, 139, 158, 159, 1, 0},
+    // Floor (ID: 1)
+    {
+        138, 139,
+        158, 159,
+        1, 0
+    },
     
-    // POWERUP
-    {140, 141, 160, 161, 1, 1},
-    
-    // ENEMY_X
-    {142, 143, 162, 163, 0, 1},
-    
-    // ENEMY_Y
-    {144, 145, 164, 165, 0, 1},
-    
-    // ENEMY_Z
-    {146, 147, 166, 167, 0, 1},
-    
-    // GATE_CLOSED
-    {148, 149, 168, 169, 0, 0},
-    
-    // GATE_OPEN
-    {150, 151, 170, 171, 1, 0},
-    
-    // KEY
-    {152, 153, 172, 173, 1, 1},
-    
-    // HEART
-    {154, 155, 174, 175, 1, 1},
-    
-    // PLAYER ANIMATIONS
-    // Front animations
-    {176, 177, 196, 197, 1, 0},  // Left foot
-    {178, 179, 198, 199, 1, 0},  // Standing
-    {180, 181, 200, 201, 1, 0},  // Right foot
-    
-    // Back animations
-    {182, 183, 202, 203, 1, 0},  // Left foot
-    {184, 185, 204, 205, 1, 0},  // Standing
-    {186, 187, 206, 207, 1, 0},  // Right foot
-    
-    // Side animations
-    {188, 189, 208, 209, 1, 0},  // Left walking
-    {190, 191, 210, 211, 1, 0},  // Left standing
-    {192, 193, 212, 213, 1, 0},  // Right standing
-    {194, 195, 214, 215, 1, 0},  // Right walking
-	
-    // HP Numbers and special tiles (20-29)
-    {216, 217, 236, 237, 1, 0},  // HP 1
-    {218, 219, 238, 239, 1, 0},  // HP 2
-    {220, 221, 240, 241, 1, 0},  // HP 3
-    {222, 223, 242, 243, 1, 0},  // HP 4
-    {224, 225, 244, 245, 1, 0},  // HP 5
-    {226, 227, 246, 247, 1, 0},  // HP 6
-    {228, 229, 248, 249, 1, 0},  // HP 7
-    {230, 231, 250, 251, 1, 0},  // HP Unknown (?)
-    {232, 233, 252, 253, 1, 0},  // PIT
-    {234, 235, 254, 255, 1, 0},   // RESERVED
-	
-    // OBSTACLE (using original wall tile for obstacles)
-    {TILE_WALL_TL, TILE_WALL_TL,
-     TILE_WALL_TL, TILE_WALL_TL,
-     0, 0}  // Not walkable
+    // Wall (ID: 2)
+    {
+        140, 141,
+        160, 161,
+        0, 0
+    },
 
+    // Enemy X (ID: 3)
+    {
+        142, 143,
+        162, 163,
+        0, 0
+    },
+
+    // Enemy Y (ID: 4)
+    {
+        144, 145,
+        164, 165,
+        0, 0
+    },
+
+    // Enemy Z (ID: 5)
+    {
+        146, 147,
+        166, 167,
+        0, 0
+    },
+
+    // Gate Closed (ID: 6)
+    {
+        148, 149,
+        168, 169,
+        0, 0
+    },
+
+    // Gate Open (ID: 7)
+    {
+        150, 151,
+        170, 171,
+        1, 0
+    },
+
+    // Key (ID: 8)
+    {
+        152, 153,
+        172, 173,
+        1, 0
+    },
+
+    // Heart (ID: 9)
+    {
+        154, 155,
+        174, 175,
+        1, 0
+    },
+    
+    // Player animations (10-19)
+    {176, 177, 196, 197, 1, 0},  // Front Left
+    {178, 179, 198, 199, 1, 0},  // Front Standing
+    {180, 181, 200, 201, 1, 0},  // Front Right
+    {182, 183, 202, 203, 1, 0},  // Back Left
+    {184, 185, 204, 205, 1, 0},  // Back Standing
+    {186, 187, 206, 207, 1, 0},  // Back Right
+    {188, 189, 208, 209, 1, 0},  // Left Walk
+    {190, 191, 210, 211, 1, 0},  // Left Standing
+    {192, 193, 212, 213, 1, 0},  // Right Standing
+    {194, 195, 214, 215, 1, 0},  // Right Walk
+
+    // Big numbers and special tiles (20-29)
+    {216, 217, 236, 237, 0, 0},  // Number 1
+    {218, 219, 238, 239, 0, 0},  // Number 2
+    {220, 221, 240, 241, 0, 0},  // Number 3
+    {222, 223, 242, 243, 0, 0},  // Number 4
+    {224, 225, 244, 245, 0, 0},  // Number 5
+    {226, 227, 246, 247, 0, 0},  // Number 6
+    {228, 229, 248, 249, 0, 0},  // Number 7
+    {230, 231, 250, 251, 0, 0},  // Question mark
+    {232, 233, 252, 253, 0, 0},  // Pit
+    {234, 235, 254, 255, 1, 0}   // Cracked floor
 };
 
 void set_metatile16(UINT8 x, UINT8 y, UINT8 metatile_id) {
     const MetaTile16* mt = &metatiles16[metatile_id];
-    
-    // Debug whole metatile
-    draw_text(1, 14, "MT ID:");
-    set_bkg_tile_xy(7, 14, char_to_tile['0' + metatile_id]);
-    
-    draw_text(1, 15, "TL,TR:");
-    set_bkg_tile_xy(7, 15, char_to_tile['0' + mt->top_left]);
-    set_bkg_tile_xy(8, 15, char_to_tile[',']);
-    set_bkg_tile_xy(9, 15, char_to_tile['0' + mt->top_right]);
-    
-    draw_text(1, 16, "BL,BR:");
-    set_bkg_tile_xy(7, 16, char_to_tile['0' + mt->bottom_left]);
-    set_bkg_tile_xy(8, 16, char_to_tile[',']);
-    set_bkg_tile_xy(9, 16, char_to_tile['0' + mt->bottom_right]);
-    
-    // Original metatile drawing code
     UINT8 base_x = x * 2;
     UINT8 base_y = y * 2;
     
@@ -341,35 +238,4 @@ void set_metatile16(UINT8 x, UINT8 y, UINT8 metatile_id) {
     set_bkg_tile_xy(base_x + 1, base_y, mt->top_right);
     set_bkg_tile_xy(base_x, base_y + 1, mt->bottom_left);
     set_bkg_tile_xy(base_x + 1, base_y + 1, mt->bottom_right);
-}
-
-void set_metatile(UINT8 x, UINT8 y, UINT8 metatile_id) {
-    const MetaTile* mt = &metatiles[metatile_id];
-    UINT8 base_x = x * 2;
-    UINT8 base_y = y * 2;
-    
-    set_bkg_tile_xy(base_x, base_y, mt->tiles[0]);
-    set_bkg_tile_xy(base_x + 1, base_y, mt->tiles[1]); 
-    set_bkg_tile_xy(base_x, base_y + 1, mt->tiles[2]);
-    set_bkg_tile_xy(base_x + 1, base_y + 1, mt->tiles[3]);
-}
-
-// Keep existing helper functions
-void set_large_tile(UINT8 x, UINT8 y, UINT8 tile) {
-   set_bkg_tile_xy(x, y, tile);
-}
-
-void draw_text(UINT8 x, UINT8 y, const char *text) {
-   while(*text) {
-       UINT8 c = (UINT8)*text;
-       if(c >= 32) {
-           set_bkg_tile_xy(x, y, char_to_tile[c]);
-           x++;
-       }
-       text++;
-   }
-}
-   
-void draw_special_tile(UINT8 x, UINT8 y, UINT8 tile) {
-   set_bkg_tile_xy(x, y, tile);
 }
