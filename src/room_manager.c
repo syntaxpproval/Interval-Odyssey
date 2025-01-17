@@ -10,17 +10,30 @@
 #include "tileset.h"
 #include "map_view.h"
 #include "globals.h"
+#include "text.h"
+
+// Add global to track which key room was selected
+UINT8 selected_key_room = 255;
 
 void init_room_system(void) {
-    // Initialize first stage
+    initrand(DIV_REG);
     init_stage(1);
 }
 
 void init_stage(UINT8 stage_number) {
     current_stage = stage_number;
+    selected_key_room = 255;  // Reset key room selection
     
     // Get correct stage template
     const LevelTemplate* template = (stage_number == 1) ? &stage1_template : &stage2_template;
+    
+    // Testing: Hardcode to Room 1 (left key room) for stage 1
+    if(stage_number == 1) {
+        selected_key_room = 1;  // Always use Room 1
+    } else {
+        // Stage 2 only has one key room (ID 8)
+        selected_key_room = 8;
+    }
     
     // Copy room data from template
     current_level.num_rooms = template->num_rooms;
@@ -36,6 +49,9 @@ void init_stage(UINT8 stage_number) {
     current_level.start_room_id = 0;
     current_room = &current_level.rooms[0];
     current_room->visited = 1;
+    
+    // Initialize key/gate system
+    init_key_gate_system();
     
     // Draw the initial room
     draw_current_room();
@@ -82,21 +98,51 @@ void generate_room_from_template(Room* room, const RoomTemplate* template) {
     // Copy the base template layout
     memcpy(room->layout, base_room_templates[template->base_template_id], ROOM_WIDTH * ROOM_HEIGHT);
     
-    // Carve exits into walls
-    if(template->exit_up != -1) {
-        room->layout[0][ROOM_WIDTH/2] = 1;     // North exit
-    }
-    if(template->exit_down != -1) {
-        room->layout[ROOM_HEIGHT-1][ROOM_WIDTH/2] = 1;  // South exit
-    }
-    if(template->exit_right != -1) {
-        room->layout[ROOM_HEIGHT/2][ROOM_WIDTH-1] = 1;  // East exit
-    }
-    if(template->exit_left != -1) {
-        room->layout[ROOM_HEIGHT/2][0] = 1;    // West exit
+    // Get room type from template
+    room->room_type = template->type;
+    
+    // Debug output if it's either room 1 or room 10 (our key rooms)
+    if(room->room_id == 1 || room->room_id == 10) {
+        char debug_text[32];
+        sprintf(debug_text, "R%d:%d KR:%d", (UINT16)room->room_id, (UINT16)room->room_type, (UINT16)selected_key_room);
+        draw_text(0, 5, debug_text);
+        wait_vbl_done();
     }
     
-    room->room_type = template->type;
+    // Place key or gate if appropriate
+if(room->room_type == ROOM_TYPE_KEY && room->room_id == selected_key_room) {
+    // Debug BEFORE attempting key placement
+    draw_text(0, 1, "HIT KEY PLACE");
+    wait_vbl_done();
+    
+    // Place key in center of room
+    UINT8 center_y = ROOM_HEIGHT/2;
+    UINT8 center_x = ROOM_WIDTH/2;
+    room->layout[center_y][center_x] = MT_KEY;
+    
+    // Debug output when key is placed
+    char debug_text[32];
+    sprintf(debug_text, "SetKey:%d,%d=%d", center_x, center_y, room->layout[center_y][center_x]);
+    draw_text(0, 2, debug_text);
+    wait_vbl_done();
+    } else if(room->room_type == ROOM_TYPE_GATE) {
+        // Place gate in center of room
+        room->layout[ROOM_HEIGHT/2][ROOM_WIDTH/2] = MT_GATE;
+    }
+    
+    // Carve exits into walls
+    if(template->exit_up != -1) {
+        room->layout[0][ROOM_WIDTH/2] = MT_FLOOR;
+    }
+    if(template->exit_down != -1) {
+        room->layout[ROOM_HEIGHT-1][ROOM_WIDTH/2] = MT_FLOOR;
+    }
+    if(template->exit_right != -1) {
+        room->layout[ROOM_HEIGHT/2][ROOM_WIDTH-1] = MT_FLOOR;
+    }
+    if(template->exit_left != -1) {
+        room->layout[ROOM_HEIGHT/2][0] = MT_FLOOR;
+    }
     
     // Set up exits
     room->num_exits = 0;

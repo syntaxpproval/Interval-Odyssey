@@ -1,23 +1,21 @@
-#ifndef ROOM_MANAGER_H
-#define ROOM_MANAGER_H
+#ifndef __ROOM_MANAGER_H
+#define __ROOM_MANAGER_H
 
 #include <gb/gb.h>
 #include "game_types.h"
 
-// Room struct
+// Room structure
 typedef struct {
     UINT8 layout[ROOM_HEIGHT][ROOM_WIDTH];
+    RoomType room_type;
     UINT8 room_id;
-    UINT8 room_type;
     UINT8 visited;
     UINT8 num_exits;
     Direction exits[4];
     UINT8 connected_rooms[4];
-    UINT8 spawn_x;
-    UINT8 spawn_y;
 } Room;
 
-// Level struct
+// Level structure
 typedef struct {
     Room rooms[MAX_ROOMS];
     UINT8 num_rooms;
@@ -25,7 +23,10 @@ typedef struct {
     UINT8 start_room_id;
 } Level;
 
-// Function declarations
+// Variables
+extern UINT8 selected_key_room;  // Made public
+
+// Functions
 void init_room_system(void);
 void init_stage(UINT8 stage_number);
 void handle_room_transition(Direction exit_dir);
