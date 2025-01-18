@@ -4,7 +4,7 @@
 #include <gb/gb.h>
 #include "game_types.h"
 
-#define NUM_BASE_TEMPLATES 3  // Changed from 14 to match our actual templates
+#define NUM_BASE_TEMPLATES 6  // Changed from 14 to match our actual templates
 
 // Level template structure
 typedef struct {

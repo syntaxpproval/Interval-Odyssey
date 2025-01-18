@@ -4,6 +4,7 @@
 #include <gb/gb.h>
 #include "game_types.h"
 #include "tileset.h"
+#include "item_manager.h"  // Added this include
 
 // Variable declarations
 extern UINT8 player_x;

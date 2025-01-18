@@ -18,26 +18,26 @@ UINT8 should_start_quiz(void) {
 
     // Gate room specific debug
     if(current_room->room_type == ROOM_TYPE_GATE) {
-        sprintf(debug, "GATE: Key:%d State:%d", 
-            has_key(), get_gate_state());
+        // Room and position info
+        sprintf(debug, "GRoom:%d Type:%d", 
+            current_room->room_id, current_room->room_type);
         draw_text(0, 1, debug);
 
-        // Player position relative to gate
-        sprintf(debug, "POS: %d,%d Gate:%d,%d", 
-            player_x, player_y, 
-            ROOM_WIDTH/2, ROOM_HEIGHT/2);
+        // Gate state info
+        sprintf(debug, "Key:%d Gate:%d", 
+            has_key(), get_gate_state());
         draw_text(0, 2, debug);
 
-        // Tile and collision info
-        sprintf(debug, "Tile:%d Walkable:%d", 
-            current_room->layout[player_y][player_x],
-            has_key() || get_gate_state() == GATE_OPEN);
+        // Position and tile info
+        sprintf(debug, "Pos:%d,%d GTile:%d", 
+            player_x, player_y,
+            current_room->layout[center_y][center_x]);
         draw_text(0, 3, debug);
 
-        // Interaction state
-        sprintf(debug, "CanPass:%d Quiz:%d", 
-            has_key() && get_gate_state() == GATE_CLOSED,
-            should_start_quiz());
+        // Movement validation - Updated to use new parameter version
+        sprintf(debug, "Walk:%d Move:%d", 
+            can_walk_on_gate(player_x, player_y),
+            player_x == ROOM_WIDTH/2 && player_y == ROOM_HEIGHT/2);
         draw_text(0, 4, debug);
     }
 
@@ -62,10 +62,5 @@ void handle_quiz_completion(UINT8 was_correct) {
         player_y = ROOM_HEIGHT/2;
         player_needs_redraw = 1;
         open_gate();
-
-        // Add debug for gate state after quiz
-        char debug[32];
-        sprintf(debug, "Quiz OK - Gate:%d", get_gate_state());
-        draw_text(0, 5, debug);
     }
 }

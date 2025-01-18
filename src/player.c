@@ -113,6 +113,7 @@ void update_player_position(void) {
     UINT8 new_y = player_y;
     Direction exit_dir = 255;
     UINT8 moved = 0;
+    UINT8 can_move = 1;  // New flag to control movement
 
     // Reset movement state
     is_moving = (joy & (J_UP | J_DOWN | J_LEFT | J_RIGHT)) ? 1 : 0;
@@ -125,7 +126,7 @@ void update_player_position(void) {
             if(new_x >= ROOM_WIDTH-1) {
                 // Only allow exit if player is at the correct height AND there's an exit
                 if(can_use_exit && player_y == ROOM_HEIGHT/2 && 
-                   current_room->layout[ROOM_HEIGHT/2][ROOM_WIDTH-1] == 1) {
+                   current_room->layout[ROOM_HEIGHT/2][ROOM_WIDTH-1] == MT_FLOOR) {
                     exit_dir = DIR_EAST;
                 }
                 new_x = player_x;
@@ -137,7 +138,7 @@ void update_player_position(void) {
             if(new_x <= 1) {
                 // Only allow exit if player is at the correct height AND there's an exit
                 if(can_use_exit && player_y == ROOM_HEIGHT/2 && 
-                   current_room->layout[ROOM_HEIGHT/2][0] == 1) {
+                   current_room->layout[ROOM_HEIGHT/2][0] == MT_FLOOR) {
                     exit_dir = DIR_WEST;
                 }
             } else {
@@ -150,7 +151,7 @@ void update_player_position(void) {
             if(new_y <= 1) {
                 // Only allow exit if player is at the correct width AND there's an exit
                 if(can_use_exit && player_x == ROOM_WIDTH/2 && 
-                   current_room->layout[0][ROOM_WIDTH/2] == 1) {
+                   current_room->layout[0][ROOM_WIDTH/2] == MT_FLOOR) {
                     exit_dir = DIR_NORTH;
                 }
             } else {
@@ -164,7 +165,7 @@ void update_player_position(void) {
             if(new_y >= ROOM_HEIGHT-1) {
                 // Only allow exit if player is at the correct width AND there's an exit
                 if(can_use_exit && player_x == ROOM_WIDTH/2 && 
-                   current_room->layout[ROOM_HEIGHT-1][ROOM_WIDTH/2] == 1) {
+                   current_room->layout[ROOM_HEIGHT-1][ROOM_WIDTH/2] == MT_FLOOR) {
                     exit_dir = DIR_SOUTH;
                 }
                 new_y = player_y;
@@ -172,14 +173,23 @@ void update_player_position(void) {
         }
 
         // Check if the new position is walkable
-        if(exit_dir == 255) {
+        if(exit_dir == 255 && moved) {
             UINT8 new_tile = current_room->layout[new_y][new_x];
-            if(new_tile != MT_WALL && new_tile != MT_BLOCK && new_tile != MT_PIT) {
+            
+            // First check basic collisions
+            if(new_tile == MT_WALL || new_tile == MT_BLOCK || new_tile == MT_PIT) {
+                can_move = 0;
+            }
+            // Then check gate collision
+            else if(new_tile == MT_GATE && !can_walk_on_gate(new_x, new_y)) {
+                can_move = 0;
+            }
+
+            // Apply movement if allowed
+            if(can_move) {
                 player_x = new_x;
                 player_y = new_y;
-                if (moved) {
-                    player_needs_redraw = 1;
-                }
+                player_needs_redraw = 1;
             }
         }
         // If trying to use exit

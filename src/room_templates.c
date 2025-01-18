@@ -35,6 +35,39 @@ const UINT8 base_room_templates[NUM_BASE_TEMPLATES][ROOM_HEIGHT][ROOM_WIDTH] = {
         {2,1,29,1,0,1,1,29,1,2},
         {2,1,1,29,1,1,29,1,1,2},
         {2,2,2,2,2,2,2,2,2,2}
+    },
+    // Template 3: Key Room
+    {
+        {0,0,0,0,0,0,0,0,0,0},
+        {0,1,1,1,1,1,1,1,1,0},
+        {0,1,1,1,1,1,1,1,1,0},
+        {0,1,1,1,1,1,1,1,1,0},
+        {0,1,1,1,1,1,1,1,1,0},
+        {0,1,1,1,1,1,1,1,1,0},
+        {0,1,1,1,1,1,1,1,1,0},
+        {0,0,0,0,0,0,0,0,0,0}
+    },
+    // Template 4: Corridor
+    {
+        {2,2,2,2,2,2,2,2,2,2},
+        {2,28,28,28,28,28,28,28,28,2},
+        {2,28,28,28,28,28,28,28,28,2},
+        {2,1,1,1,1,1,1,1,1,2},
+        {2,1,1,1,1,1,1,1,1,2},
+        {2,28,28,28,28,28,28,28,28,2},
+        {2,28,28,28,28,28,28,28,28,2},
+        {2,2,2,2,2,2,2,2,2,2}
+    },
+    // Template 5: Item room
+    {
+        {2,2,2,2,2,2,2,2,2,2},
+        {2,2,2,1,1,1,1,2,2,2},
+        {2,2,2,1,1,1,1,2,2,2},
+        {2,2,2,1,1,1,1,2,2,2},
+        {2,2,2,1,1,1,1,2,2,2},
+        {2,2,2,2,2,2,2,2,2,2},
+        {2,2,2,2,2,2,2,2,2,2},
+        {2,2,2,2,2,2,2,2,2,2}
     }
 };
 
@@ -45,7 +78,7 @@ const LevelTemplate stage1_template = {
         {0, ROOM_TYPE_STAGING, 3, -1, -1, -1},
         
         // Room ID: 1 - Key Room Left
-        {1, ROOM_TYPE_KEY, -1, 2, -1, -1},
+        {3, ROOM_TYPE_KEY, -1, 2, -1, -1},
 
         // Room ID: 2 - Combat Room
         {1, ROOM_TYPE_COMBAT, -1, 6, 3, 1},
@@ -63,16 +96,16 @@ const LevelTemplate stage1_template = {
         {1, ROOM_TYPE_COMBAT, 5, 8, 7, 2},
 
         // Room ID: 7 - Bonus Room
-        {1, ROOM_TYPE_BONUS, 6, -1, -1, -1},
+        {5, ROOM_TYPE_BONUS, 6, -1, -1, -1},
 
         // Room ID: 8 - Combat Room Right
         {1, ROOM_TYPE_COMBAT, -1, 9, -1, 6},
 
         // Room ID: 9 - Corridor
-        {1, ROOM_TYPE_CORRIDOR, -1, 10, -1, 8},
+        {4, ROOM_TYPE_CORRIDOR, -1, 10, -1, 8},
 
         // Room ID: 10 - Key Room Right
-        {1, ROOM_TYPE_KEY, -1, -1, -1, 9}
+        {3, ROOM_TYPE_KEY, -1, -1, -1, 9}
     }
 };
 

@@ -11,5 +11,6 @@ UINT8 has_key(void);
 UINT8 get_gate_state(void);
 UINT8 should_start_quiz(void);
 void handle_quiz_completion(UINT8 correct);
+UINT8 can_walk_on_gate(UINT8 target_x, UINT8 target_y);
 
 #endif
