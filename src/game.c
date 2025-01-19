@@ -19,23 +19,27 @@
 #include "game_types.h"
 #include "text.h"
 
-// Game states
 typedef enum {
+    STATE_MENU,
     STATE_GAME,
-    STATE_MAP,
-    STATE_QUIZ,
-    STATE_TRANSITION,
-    STATE_GATE_DELAY  // New state for gate delay
+    STATE_SETTINGS,
+    STATE_MUSIC
 } GameState;
 
-GameState current_state = STATE_GAME;
+GameState current_state = STATE_MENU;
+UINT8 menu_selection = 0;
+UINT8 needs_redraw = 1;
+
 GameSettings settings = {
     .sound_fx_enabled = 1,
     .music_enabled = 1,
     .difficulty = DIFFICULTY_NORMAL
 };
 
-UINT8 gate_delay = 0;  // Counter for gate delay
+UINT8 gate_delay = 0;
+UINT16 initial_seed = 0;
+UINT8 rand_1 = 0;
+UINT8 rand_2 = 0;
 
 void init_graphics(void) {
     DISPLAY_OFF;
@@ -45,76 +49,118 @@ void init_graphics(void) {
     DISPLAY_ON;
 }
 
+void init_game_systems(void) {
+    // Initialize all game subsystems in correct order
+    init_sound();
+    init_room_system();
+    init_player();
+    init_key_gate_system();
+    draw_current_room();
+    
+    // Debug info
+    draw_text(0, 17, "DEBUG MODE");
+}
+
+void draw_menu_screen(void) {
+    // Clear screen
+    fill_bkg_rect(0, 0, 20, 18, char_to_tile[' ']);
+    
+    // Draw musical border at top
+    for(UINT8 x = 0; x < 20; x += 2) {
+        set_bkg_tile_xy(x, 0, 114);     
+        set_bkg_tile_xy(x+1, 0, 114);   
+    }
+    
+    // Draw title
+    draw_text(2, 4, "INTERVAL ODYSSEY");
+    
+    // Draw menu items
+    const char* menu_items[] = {
+        "PLAY GAME",
+        "SETTINGS",
+        "MUSIC MODE"
+    };
+    
+    for(UINT8 i = 0; i < NUM_MENU_ITEMS; i++) {
+        UINT8 y = 8 + (i * 2);
+        // Draw selection cursor
+        if(i == menu_selection) {
+            draw_text(3, y, ">");
+        }
+        draw_text(4, y, menu_items[i]);
+    }
+}
+
+void handle_menu_input(UINT8 joy) {
+    static UINT8 last_joy = 0;
+    
+    // Only process new button presses
+    if(joy != last_joy) {
+        if(joy & J_UP && menu_selection > 0) {
+            menu_selection--;
+            needs_redraw = 1;
+        }
+        else if(joy & J_DOWN && menu_selection < NUM_MENU_ITEMS - 1) {
+            menu_selection++;
+            needs_redraw = 1;
+        }
+        else if(joy & J_START || joy & J_A) {
+            switch(menu_selection) {
+                case MENU_PLAY:
+                    // Start the game with proper initialization
+                    current_state = STATE_GAME;
+                    init_game_systems();
+                    break;
+                case MENU_SETTINGS:
+                    current_state = STATE_SETTINGS;
+                    needs_redraw = 1;
+                    break;
+                case MENU_MUSIC:
+                    current_state = STATE_MUSIC;
+                    needs_redraw = 1;
+                    break;
+            }
+        }
+        last_joy = joy;
+    }
+}
+
 void update_game_state(UINT8 joy) {
-    char debug_str[21];
-    UINT8 map_toggled;
-    UINT8 start_pressed = joy & J_START;
+    static UINT8 first_update = 1;
     
-    // Always check for map toggle
-    map_toggled = check_map_toggle(start_pressed);
-    
-    if (map_toggled) {
-        current_state = is_map_visible ? STATE_MAP : STATE_GAME;
-        return;
+    if (first_update) {
+        char debug[32];
+        sprintf(debug, "INIT>%02x,%02x", rand_1, rand_2);
+        draw_text(0, 11, debug);
+        first_update = 0;
     }
     
     switch(current_state) {
+        case STATE_MENU:
+            if(needs_redraw) {
+                draw_menu_screen();
+                needs_redraw = 0;
+            }
+            handle_menu_input(joy);
+            break;
+            
         case STATE_GAME:
-            // Check if we should enter gate delay
             if (should_start_quiz()) {
-                current_state = STATE_GATE_DELAY;
-                gate_delay = 30;  // About 0.5 seconds at 60fps
+                gate_delay = 30;
                 draw_text(0, 8, "Gate Delay");
                 return;
             }
-            
-            // Normal game updates
             update_player_position();
             update_key_gate();
+            log_debug_info();
             break;
             
-        case STATE_GATE_DELAY:
-            if (gate_delay > 0) {
-                gate_delay--;
-            } else {
-                // Delay finished, start quiz
-                current_state = STATE_QUIZ;
-                init_quiz_mode(get_current_level());
-                draw_text(0, 8, "Quiz Start");
-            }
+        case STATE_SETTINGS:
+            // TODO: Implement settings screen
             break;
             
-        case STATE_MAP:
-            // Map toggle is handled above
-            break;
-            
-        case STATE_QUIZ:
-            handle_quiz_input(joy);
-            update_quiz_state();
-            
-            if (is_quiz_complete()) {
-                // Debug output for stage transition
-                sprintf(debug_str, "Complete:%d", quiz_was_correct());
-                draw_text(0, 9, debug_str);
-                
-                sprintf(debug_str, "NeedStg:%d", needs_stage_change());
-                draw_text(0, 10, debug_str);
-                
-                if (needs_stage_change()) {
-                    // Transition to next stage
-                    draw_text(0, 11, "Stage->2");
-                    init_stage(2);  // Move to stage 2
-                    clear_stage_transition();
-                }
-                current_state = STATE_GAME;
-                handle_quiz_completion(quiz_was_correct());
-            }
-            break;
-            
-        case STATE_TRANSITION:
-            if (!is_transition_active()) {
-                current_state = STATE_GAME;
-            }
+        case STATE_MUSIC:
+            // TODO: Implement music mode
             break;
     }
 }
@@ -124,37 +170,44 @@ void main(void) {
     BGP_REG = 0xE4;
     OBP0_REG = 0xE4;
     
-    // More aggressive randomization
-    UINT16 seed = 0;
-    for(UINT8 i = 0; i < 10; i++) {
-        wait_vbl_done();
-        seed ^= DIV_REG;
-        seed += TIMA_REG;
-    }
-    if(seed == 0) seed = 0x1337;
-    initrand(seed);
-    
-    // Initialize systems
+    // Initialize graphics early
     init_graphics();
-    init_sound();
-    init_room_system();
-    init_player();
-    init_key_gate_system();
-    
-    // Make sure room is drawn before enabling display
-    draw_current_room();
-    
     SHOW_BKG;
     DISPLAY_ON;
     
-    // Debug mode indicator
-    draw_text(0, 17, "DEBUG MODE");
+    // Initial menu draw
+    draw_menu_screen();
     
+    // Wait for player input while gathering entropy
+    UINT16 entropy = 0;
     while(1) {
+        // Increment entropy counter
+        entropy++;
+        
+        // Get joypad state
         UINT8 joy = joypad();
         
+        if(joy & J_START || joy & J_A) {
+            // Mix all values together
+            UINT8 div = DIV_REG;
+            UINT8 tima = TIMA_REG;
+            initial_seed = (div << 8) | (tima ^ (entropy & 0xFF));
+            
+            // Initialize random number generator
+            initrand(initial_seed);
+            
+            // Get first two random values for debug
+            rand_1 = rand() & 0xFF;
+            rand_2 = rand() & 0xFF;
+            break;
+        }
+        wait_vbl_done();
+    }
+    
+    // Main game loop
+    while(1) {
+        UINT8 joy = joypad();
         update_game_state(joy);
-        
         wait_vbl_done();
     }
 }
