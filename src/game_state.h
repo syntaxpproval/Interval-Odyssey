@@ -3,12 +3,6 @@
 
 #include <gb/gb.h>
 
-// Menu Definitions
-#define NUM_MENU_ITEMS 3
-#define MENU_PLAY 0
-#define MENU_SETTINGS 1
-#define MENU_MUSIC 2
-
 // Functions
 UINT8 should_start_quiz(void);
 UINT8 get_current_level(void);

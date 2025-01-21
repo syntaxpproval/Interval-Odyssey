@@ -5,45 +5,17 @@
 
 extern GameSettings settings;
 
-// Note frequencies (C root)
-// Lowest octave (1)
-#define NOTE_C1  131
-#define NOTE_D1  147
-#define NOTE_Eb1 156
-#define NOTE_E1  165
-#define NOTE_F1  175
-#define NOTE_Gb1 185
-#define NOTE_G1  196
-#define NOTE_Ab1 208
-#define NOTE_A1  220
-#define NOTE_Bb1 233
-#define NOTE_B1  247
+// Map of note indices to frequencies (C2-B3)
+const UINT16 SEQUENCER_NOTE_FREQS[24] = {
+    NOTE_C2, NOTE_D2, NOTE_Eb2, NOTE_E2, NOTE_F2, NOTE_Gb2, NOTE_G2, NOTE_Ab2, NOTE_A2, NOTE_Bb2, NOTE_B2,
+    NOTE_C3, NOTE_D3, NOTE_Eb3, NOTE_E3, NOTE_F3, NOTE_Gb3, NOTE_G3, NOTE_Ab3, NOTE_A3, NOTE_Bb3, NOTE_B3
+};
 
-// Lower octave (2)
-#define NOTE_C2  262
-#define NOTE_D2  294
-#define NOTE_Eb2 311
-#define NOTE_E2  330
-#define NOTE_F2  349
-#define NOTE_Gb2 370
-#define NOTE_G2  392
-#define NOTE_Ab2 415
-#define NOTE_A2  440
-#define NOTE_Bb2 466
-#define NOTE_B2  494
-
-// Higher octave (3)
-#define NOTE_C3  523
-#define NOTE_D3  587
-#define NOTE_Eb3 622
-#define NOTE_E3  659
-#define NOTE_F3  698
-#define NOTE_Gb3 740
-#define NOTE_G3  784
-#define NOTE_Ab3 831
-#define NOTE_A3  880
-#define NOTE_Bb3 932
-#define NOTE_B3  988
+// Get note frequency from index (0-23 maps to C2-B3)
+UINT16 get_note_frequency(UINT8 note_idx) {
+    if(note_idx >= 24) return NOTE_C2;  // Default to C2 if out of range
+    return SEQUENCER_NOTE_FREQS[note_idx];
+}
 
 void init_sound(void) {
     NR52_REG = 0x80; // Turn on sound
@@ -79,6 +51,15 @@ const char* get_chord_name(ChordType chord) {
         case CHORD_DIMINISHED7: return "DIM7";
         default: return "UNKNOWN";
     }
+}
+
+void play_menu_sound(void) {
+    NR10_REG = 0x00;  // No sweep
+    NR11_REG = 0x80;  // 50% duty cycle
+    NR12_REG = 0x73;  // Volume envelope
+    NR13_REG = (UINT8)(freq_to_period(NOTE_C3) & 0xFF);
+    NR14_REG = 0x86 | ((freq_to_period(NOTE_C3) >> 8) & 0x07);
+    delay(50);
 }
 
 void play_arpeggio(ChordType chord) {
