@@ -57,7 +57,8 @@ typedef enum {
     CHORD_DOMINANT7,
     CHORD_MAJOR7,
     CHORD_MINOR7,
-    CHORD_DIMINISHED7
+    CHORD_DIMINISHED7,
+    CHORD_HALF_DIMINISHED7
 } ChordType;
 
 #endif

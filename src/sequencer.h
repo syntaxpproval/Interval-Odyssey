@@ -6,8 +6,8 @@
 #define SEQ_MAX_STEPS 16
 #define SEQ_MIN_TEMPO 60
 #define SEQ_MAX_TEMPO 240
-#define SEQ_MIN_NOTE 0
-#define SEQ_MAX_NOTE 23
+#define SEQ_MIN_NOTE 0        // C3
+#define SEQ_MAX_NOTE 67       // G8
 #define SEQ_MAX_ADSR 15
 
 typedef enum {
@@ -31,10 +31,6 @@ typedef struct {
 typedef struct {
     UINT8 tempo;
     UINT8 current_step;
-    UINT8 ch1_note;
-    UINT8 ch2_note;
-    UINT8 ch3_note;
-    UINT8 ch4_note;
     UINT8 cursor;
     UINT8 is_editing;
     UINT8 in_grid_mode;
@@ -43,10 +39,11 @@ typedef struct {
     UINT8 adsr[3];
     UINT8 last_error;
     UINT8 debug_mode;
-    UINT8 is_playing;        // New field
-    UINT8 playback_step;     // New field
-    UINT8 frame_counter;     // New field
-    UINT8 frames_per_step;   // New field
+    UINT8 is_playing;
+    UINT8 playback_step;
+    UINT8 frame_counter;
+    UINT8 frames_per_step;
+    UINT8 current_channel;
     SEQUENCER_STEP steps[SEQ_MAX_STEPS];
 } SEQUENCER_DATA;
 
