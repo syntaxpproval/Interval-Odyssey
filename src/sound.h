@@ -7,18 +7,18 @@
 // Full GameBoy Sound Range with GB Values (Hz shown in comments)
 
 // Octave 3
-#define NOTE_C3    44    // 65.406
-#define NOTE_Db3   156   // 69.295
-#define NOTE_D3    262   // 73.416
-#define NOTE_Eb3   363   // 77.781
-#define NOTE_E3    457   // 82.406
-#define NOTE_F3    547   // 87.307
-#define NOTE_Gb3   631   // 92.499
-#define NOTE_G3    710   // 97.998
-#define NOTE_Ab3   786   // 103.82
-#define NOTE_A3    854   // 110.00
-#define NOTE_Bb3   923   // 116.54
-#define NOTE_B3    986   // 123.47
+#define NOTE_C3    2044  // 65.406 Hz
+#define NOTE_Db3   2037  // 69.295 Hz
+#define NOTE_D3    2030  // 73.416 Hz
+#define NOTE_Eb3   2023  // 77.781 Hz
+#define NOTE_E3    2015  // 82.406 Hz
+#define NOTE_F3    2007  // 87.307 Hz
+#define NOTE_Gb3   1999  // 92.499 Hz
+#define NOTE_G3    1990  // 97.998 Hz
+#define NOTE_Ab3   1981  // 103.82 Hz
+#define NOTE_A3    1971  // 110.00 Hz
+#define NOTE_Bb3   1961  // 116.54 Hz
+#define NOTE_B3    1950  // 123.47 Hz
 
 // Octave 4
 #define NOTE_C4    1046  // 130.81

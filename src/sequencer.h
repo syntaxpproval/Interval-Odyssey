@@ -10,40 +10,54 @@
 #define SEQ_MAX_NOTE 67       // G8
 #define SEQ_MAX_ADSR 15
 
+// Menu layer states
 typedef enum {
-    PARAM_CH1,
-    PARAM_CH2, 
-    PARAM_CH3,
-    PARAM_CH4,
-    PARAM_TEMPO,
-    PARAM_ADSR_A,
-    PARAM_ADSR_D,
-    PARAM_ADSR_S,
+    MENU_MAIN,
+    MENU_SUB,
+    MENU_GRID
+} MENU_LAYER;
+
+// Channel parameters
+typedef enum {
+    PARAM_STEP,
+    PARAM_NOTE,
+    PARAM_ATTACK,
+    PARAM_DECAY, 
+    PARAM_VOLUME,
+    PARAM_TYPE,
     PARAM_COUNT
-} SEQUENCER_PARAMETER;
+} CHANNEL_PARAMETER;
+
+// Channel types (placeholder)
+typedef enum {
+    TYPE_SQUARE,
+    TYPE_COUNT
+} CHANNEL_TYPE;
 
 typedef struct {
     UINT8 armed;
     UINT8 note;
     UINT8 volume;
+    UINT8 attack;
+    UINT8 decay;
 } SEQUENCER_STEP;
 
 typedef struct {
     UINT8 tempo;
     UINT8 current_step;
     UINT8 cursor;
-    UINT8 is_editing;
-    UINT8 in_grid_mode;
+    UINT8 current_channel;
+    UINT8 current_parameter;
+    MENU_LAYER menu_layer;
     UINT8 blink_counter;
     UINT8 needs_redraw;
-    UINT8 adsr[3];
     UINT8 last_error;
     UINT8 debug_mode;
     UINT8 is_playing;
     UINT8 playback_step;
     UINT8 frame_counter;
     UINT8 frames_per_step;
-    UINT8 current_channel;
+    CHANNEL_TYPE channel_type;
     SEQUENCER_STEP steps[SEQ_MAX_STEPS];
 } SEQUENCER_DATA;
 
