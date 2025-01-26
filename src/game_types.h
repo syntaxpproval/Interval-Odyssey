@@ -25,6 +25,23 @@ typedef enum {
     DIR_WEST
 } Direction;
 
+typedef enum {
+    SOUND_CH1 = 0,
+    SOUND_CH2,
+    SOUND_CH3,
+    SOUND_CH4,
+    SOUND_CH_COUNT
+} SoundChannel;
+
+// Add channel-specific configuration types
+typedef struct {
+    UINT8 sweep;    // Channel 1 only
+    UINT8 duty;     // Channels 1 & 2
+    UINT8 length;   // All channels
+    UINT8 envelope; // Channels 1, 2, & 4
+    UINT8 freq;     // Channels 1, 2, & 3
+} ChannelConfig;
+
 // Room types
 typedef enum {
     ROOM_TYPE_NORMAL,

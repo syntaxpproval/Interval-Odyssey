@@ -144,6 +144,25 @@ void play_sound(UINT8 sound_id) {
     }
 }
 
+void play_note_ch2(UINT8 note_idx, UINT8 volume, UINT8 duty) {
+   UINT16 freq = get_note_frequency(note_idx);
+   
+   NR21_REG = duty | 0x3F;              // Duty cycle and sound length
+   NR22_REG = (volume << 4) | 0x07;     // Volume and envelope
+   NR23_REG = (UINT8)(freq & 0xFF);     // Frequency LSB
+   NR24_REG = 0x86 | ((freq >> 8) & 0x07); // Trigger + frequency MSB
+}
+
+void stop_note_ch2(void) {
+   NR22_REG = 0x00; // Set volume to 0
+   NR24_REG = 0x80; // Stop sound
+}
+
+void set_ch2_envelope(UINT8 attack, UINT8 decay) {
+   UINT8 envelope = (attack << 4) | (decay & 0x07);
+   NR22_REG = envelope;
+}
+
 void play_victory_sound(void) {
     play_sound(0);
     delay(200);

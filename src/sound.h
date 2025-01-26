@@ -4,9 +4,37 @@
 #include <gb/gb.h>
 #include "game_types.h"
 
+// Channel registers
+#define CH1_SWEEP    0xFF10
+#define CH1_LENGTH   0xFF11
+#define CH1_ENV      0xFF12
+#define CH1_FREQL    0xFF13
+#define CH1_FREQH    0xFF14
+
+#define CH2_LENGTH   0xFF16
+#define CH2_ENV      0xFF17
+#define CH2_FREQL    0xFF18
+#define CH2_FREQH    0xFF19
+
+#define CH3_ON       0xFF1A
+#define CH3_LENGTH   0xFF1B
+#define CH3_LEVEL    0xFF1C
+#define CH3_FREQL    0xFF1D
+#define CH3_FREQH    0xFF1E
+
+#define CH4_LENGTH   0xFF20
+#define CH4_ENV      0xFF21
+#define CH4_POLY     0xFF22
+#define CH4_COUNT    0xFF23
+
+#define CH2_DUTY_12_5 0x00
+#define CH2_DUTY_25   0x40  
+#define CH2_DUTY_50   0x80
+#define CH2_DUTY_75   0xC0
+
 // Full GameBoy Sound Range with GB Values (Hz shown in comments)
 
-// Octave 3
+// Octave 3 - Note: Only A3-B3 are reliable on Channel 1
 #define NOTE_C3    2044  // 65.406 Hz
 #define NOTE_Db3   2037  // 69.295 Hz
 #define NOTE_D3    2030  // 73.416 Hz
@@ -88,6 +116,8 @@
 
 void init_sound(void);
 void play_sound(UINT8 sound_id);
+void play_note(UINT8 channel, UINT8 note_idx, UINT8 volume);
+void stop_note(UINT8 channel);
 void play_correct_sound(void);
 void play_wrong_sound(void);
 void play_arpeggio(ChordType chord);
@@ -96,6 +126,9 @@ void play_menu_sound(void);
 void play_gate_open(void);
 void play_victory_sound(void);
 const char* get_chord_name(ChordType chord);
+void play_note_ch2(UINT8 note_idx, UINT8 volume, UINT8 duty);
+void stop_note_ch2(void);
+void set_ch2_envelope(UINT8 attack, UINT8 decay);
 
 UINT16 get_note_frequency(UINT8 note_idx);
 UINT16 freq_to_period(UINT16 freq);
