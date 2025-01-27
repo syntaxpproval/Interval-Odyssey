@@ -147,10 +147,10 @@ void play_sound(UINT8 sound_id) {
 void play_note_ch2(UINT8 note_idx, UINT8 volume, UINT8 duty) {
    UINT16 freq = get_note_frequency(note_idx);
    
-   NR21_REG = duty | 0x3F;              // Duty cycle and sound length
-   NR22_REG = (volume << 4) | 0x07;     // Volume and envelope
-   NR23_REG = (UINT8)(freq & 0xFF);     // Frequency LSB
-   NR24_REG = 0x86 | ((freq >> 8) & 0x07); // Trigger + frequency MSB
+   NR21_REG = CH2_DUTY_25 | 0x3F;     // Using 25% duty cycle
+   NR22_REG = (volume << 4) | 0x07;    
+   NR23_REG = (UINT8)(freq & 0xFF);    
+   NR24_REG = 0x86 | ((freq >> 8) & 0x07);
 }
 
 void stop_note_ch2(void) {

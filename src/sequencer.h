@@ -13,8 +13,7 @@
 
 typedef enum {
     MENU_MAIN,
-    MENU_SUB,
-    MENU_GRID
+    MENU_SUB
 } MENU_LAYER;
 
 typedef enum {
@@ -24,6 +23,8 @@ typedef enum {
     PARAM_DECAY, 
     PARAM_VOLUME,
     PARAM_TYPE,
+    PARAM_MUTE,
+    PARAM_EXIT,
     PARAM_COUNT
 } CHANNEL_PARAMETER;
 
@@ -47,6 +48,7 @@ typedef struct {
     SEQUENCER_STEP steps[SEQ_MAX_STEPS];
     CHANNEL_TYPE type;
     UINT8 enabled;
+    UINT8 muted;
 } CHANNEL_DATA;
 
 typedef struct {
@@ -64,6 +66,8 @@ typedef struct {
     UINT8 playback_step;
     UINT8 frame_counter;
     UINT8 frames_per_step;
+	UINT8 last_parameter;    // New: Track last parameter
+    UINT8 last_cursor_pos;   // New: Track last cursor
     CHANNEL_DATA channels[SEQ_NUM_CHANNELS];
 } SEQUENCER_DATA;
 
@@ -73,6 +77,7 @@ void draw_sequencer(void);
 void handle_sequencer_input(UINT8 joy);
 void cleanup_sequencer(void);
 void toggle_sequencer_debug(void);
+void draw_grid(void);
 const char* get_last_error(void);
 
 #define SEQ_ERR_NONE 0
