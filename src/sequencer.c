@@ -142,11 +142,11 @@ static void draw_sub_menu(void) {
    draw_grid();
 
    // Draw parameters
-   draw_text(10, menu_start_y, "STEP");
-   draw_text(10, menu_start_y + 1, "NOTE");
-   draw_text(10, menu_start_y + 2, "ATTACK");
-   draw_text(10, menu_start_y + 3, "DECAY");
-   draw_text(10, menu_start_y + 4, "VOLUME");
+   draw_text(10, menu_start_y, "STEP    ");
+   draw_text(10, menu_start_y + 1, "NOTE    ");
+   draw_text(10, menu_start_y + 2, "ATTACK  ");
+   draw_text(10, menu_start_y + 3, "DECAY   ");
+   draw_text(10, menu_start_y + 4, "VOLUME ");
    draw_text(10, menu_start_y + 5, "TYPE");
    draw_text(10, menu_start_y + 6, "MUTE CH");
    draw_text(10, menu_start_y + 7, "EXIT");
@@ -201,7 +201,9 @@ switch(sequencer.current_parameter) {
 }
 
 void draw_grid(void) {
-    UINT8 grid_start_y = 4;  // Moved down for centering
+    UINT8 grid_start_y = 4;
+    UINT8 block_tiles[4];  // Buffer for 2x2 tile block
+    
     wait_vbl_done();
     fill_bkg_rect(0, grid_start_y, 10, 16, 0);
     
@@ -217,11 +219,12 @@ void draw_grid(void) {
             tile = TILE_BLANK;
         }
         
+        // Fill the block buffer
+        memset(block_tiles, tile, 4);
+        
         wait_vbl_done();
-        set_bkg_tile_xy(x, y, tile);
-        set_bkg_tile_xy(x + 1, y, tile);
-        set_bkg_tile_xy(x, y + 1, tile);
-        set_bkg_tile_xy(x + 1, y + 1, tile);
+        // Update all 4 tiles at once
+        set_bkg_tiles(x, y, 2, 2, block_tiles);
     }
 }
 
@@ -239,6 +242,45 @@ void draw_sequencer(void) {
        draw_debug_info();
    }
 }
+
+static void update_parameter_display(void) {
+    CHANNEL_DATA* channel = &sequencer.channels[sequencer.current_channel];
+    SEQUENCER_STEP* step = &channel->steps[sequencer.current_step];
+    char value_buffer[21];
+    
+    switch(sequencer.current_parameter) {
+        case PARAM_STEP:
+            sprintf(value_buffer, "STEP: %d", sequencer.current_step + 1);
+            break;
+        case PARAM_NOTE:
+            sprintf(value_buffer, "NOTE: %s", NOTE_NAMES[step->note]);
+            break;
+        case PARAM_ATTACK:
+            sprintf(value_buffer, "ATTACK: %d", step->attack);
+            break;
+        case PARAM_DECAY:
+            sprintf(value_buffer, "DECAY: %d", step->decay);
+            break;
+        case PARAM_VOLUME:
+            sprintf(value_buffer, "VOLUME: %d", step->volume);
+            break;
+        case PARAM_TYPE:
+            sprintf(value_buffer, "TYPE: %s", TYPE_NAMES[channel->type]);
+            break;
+        case PARAM_MUTE:
+            sprintf(value_buffer, "MUTE: %s", channel->muted ? "ON" : "OFF");
+            break;
+        case PARAM_EXIT:
+            sprintf(value_buffer, "CH. SELECT");
+            break;
+    }
+    
+    wait_vbl_done();
+    fill_bkg_rect(0, 14, 20, 1, 0);
+    UINT8 x_pos = (20 - strlen(value_buffer)) / 2;
+    draw_text(x_pos, 14, value_buffer);
+}
+
 
 // Input handling for main menu
 static void handle_main_menu_input(UINT8 joy) {
@@ -285,38 +327,8 @@ static void handle_sub_menu_input(UINT8 joy) {
        draw_text(18, menu_start_y + sequencer.last_parameter, " ");
        draw_text(18, menu_start_y + sequencer.current_parameter, ">");
        
-       // Update value display at y=14
-       char value_buffer[21];
-       switch(sequencer.current_parameter) {
-           case PARAM_STEP:
-               sprintf(value_buffer, "STEP: %d", sequencer.current_step + 1);
-               break;
-           case PARAM_NOTE:
-               sprintf(value_buffer, "NOTE: %s", NOTE_NAMES[step->note]);
-               break;
-           case PARAM_ATTACK:
-               sprintf(value_buffer, "ATTACK: %d", step->attack);
-               break;
-           case PARAM_DECAY:
-               sprintf(value_buffer, "DECAY: %d", step->decay);
-               break;
-           case PARAM_VOLUME:
-               sprintf(value_buffer, "VOLUME: %d", step->volume);
-               break;
-           case PARAM_TYPE:
-               sprintf(value_buffer, "TYPE: %s", TYPE_NAMES[channel->type]);
-               break;
-           case PARAM_MUTE:
-               sprintf(value_buffer, "MUTE: %s", channel->muted ? "ON" : "OFF");
-               break;
-           case PARAM_EXIT:
-               sprintf(value_buffer, "CH. SELECT");
-               break;
-       }
-       wait_vbl_done();
-       fill_bkg_rect(0, 14, 20, 1, 0);
-       UINT8 x_pos = (20 - strlen(value_buffer)) / 2;
-       draw_text(x_pos, 14, value_buffer);
+       // Update value display using helper function
+       update_parameter_display();
    }
    
    if(joy & J_DOWN && sequencer.current_parameter < PARAM_COUNT - 1) {
@@ -328,37 +340,8 @@ static void handle_sub_menu_input(UINT8 joy) {
        draw_text(18, menu_start_y + sequencer.last_parameter, " ");
        draw_text(18, menu_start_y + sequencer.current_parameter, ">");
        
-       char value_buffer[21];
-       switch(sequencer.current_parameter) {
-           case PARAM_STEP:
-               sprintf(value_buffer, "STEP: %d", sequencer.current_step + 1);
-               break;
-           case PARAM_NOTE:
-               sprintf(value_buffer, "NOTE: %s", NOTE_NAMES[step->note]);
-               break;
-           case PARAM_ATTACK:
-               sprintf(value_buffer, "ATTACK: %d", step->attack);
-               break;
-           case PARAM_DECAY:
-               sprintf(value_buffer, "DECAY: %d", step->decay);
-               break;
-           case PARAM_VOLUME:
-               sprintf(value_buffer, "VOLUME: %d", step->volume);
-               break;
-           case PARAM_TYPE:
-               sprintf(value_buffer, "TYPE: %s", TYPE_NAMES[channel->type]);
-               break;
-           case PARAM_MUTE:
-               sprintf(value_buffer, "MUTE: %s", channel->muted ? "ON" : "OFF");
-               break;
-           case PARAM_EXIT:
-               sprintf(value_buffer, "CH. SELECT");
-               break;
-       }
-       wait_vbl_done();
-       fill_bkg_rect(0, 14, 20, 1, 0);
-       UINT8 x_pos = (20 - strlen(value_buffer)) / 2;
-       draw_text(x_pos, 14, value_buffer);
+       // Update value display using helper function
+       update_parameter_display();
    }
    
    if(joy & J_LEFT || joy & J_RIGHT) {
@@ -392,63 +375,27 @@ static void handle_sub_menu_input(UINT8 joy) {
                break;
        }
        
-       // Update value display if parameter changed
-       char value_buffer[21];
-       switch(sequencer.current_parameter) {
-           case PARAM_STEP:
-               sprintf(value_buffer, "STEP: %d", sequencer.current_step + 1);
-               break;
-           case PARAM_NOTE:
-               sprintf(value_buffer, "NOTE: %s", NOTE_NAMES[step->note]);
-               break;
-           case PARAM_ATTACK:
-               sprintf(value_buffer, "ATTACK: %d", step->attack);
-               break;
-           case PARAM_DECAY:
-               sprintf(value_buffer, "DECAY: %d", step->decay);
-               break;
-           case PARAM_VOLUME:
-               sprintf(value_buffer, "VOLUME: %d", step->volume);
-               break;
-           case PARAM_TYPE:
-               sprintf(value_buffer, "TYPE: %s", TYPE_NAMES[channel->type]);
-               break;
-           case PARAM_MUTE:
-               sprintf(value_buffer, "MUTE: %s", channel->muted ? "ON" : "OFF");
-               break;
-           case PARAM_EXIT:
-               sprintf(value_buffer, "CH. SELECT");
-               break;
-       }
-       wait_vbl_done();
-       fill_bkg_rect(0, 14, 20, 1, 0);
-       UINT8 x_pos = (20 - strlen(value_buffer)) / 2;
-       draw_text(x_pos, 14, value_buffer);
+       // Update value display using helper function
+       update_parameter_display();
    }
    
    if(joy & J_A) {
        switch(sequencer.current_parameter) {
            case PARAM_STEP:
                channel->steps[sequencer.current_step].armed ^= 1;
+               UINT8 block_tiles[4];
                UINT8 x = (sequencer.current_step % 4) * 2 + GRID_START_X;
                UINT8 y = (sequencer.current_step / 4) * 2 + 4;
                UINT8 tile = channel->steps[sequencer.current_step].armed ? TILE_ARMED : TILE_UNARMED;
                
+               memset(block_tiles, tile, 4);
                wait_vbl_done();
-               set_bkg_tile_xy(x, y, tile);
-               set_bkg_tile_xy(x + 1, y, tile);
-               set_bkg_tile_xy(x, y + 1, tile);
-               set_bkg_tile_xy(x + 1, y + 1, tile);
+               set_bkg_tiles(x, y, 2, 2, block_tiles);
                break;
                
            case PARAM_MUTE:
                channel->muted ^= 1;
-               char value_buffer[21];
-               sprintf(value_buffer, "MUTE: %s", channel->muted ? "ON" : "OFF");
-               wait_vbl_done();
-               fill_bkg_rect(0, 14, 20, 1, 0);
-               UINT8 x_pos = (20 - strlen(value_buffer)) / 2;
-               draw_text(x_pos, 14, value_buffer);
+               update_parameter_display();  // Use helper function here too
                break;
                
            case PARAM_EXIT:
@@ -492,34 +439,37 @@ void handle_sequencer_input(UINT8 joy) {
   }
 }
 
+static void update_step_visuals(void) {
+    UINT8 x = (sequencer.current_step % 4) * 2 + GRID_START_X;
+    UINT8 y = (sequencer.current_step / 4) * 2 + GRID_START_Y;
+    UINT8 tile = (sequencer.blink_counter > 15) ? TILE_BLANK : 
+        (sequencer.channels[sequencer.current_channel].steps[sequencer.current_step].armed ? 
+        TILE_ARMED : TILE_UNARMED);
+    
+    UINT8 block_tiles[4];
+    memset(block_tiles, tile, 4);
+    
+    wait_vbl_done();
+    set_bkg_tiles(x, y, 2, 2, block_tiles);
+}
+
 void update_sequencer(void) {
-  static UINT8 last_blink_state = 0;
-  static UINT8 last_playback_step = 0;
-  
-  sequencer.blink_counter++;
-  if(sequencer.blink_counter > 30) {
-      sequencer.blink_counter = 0;
-  }
-  
-  // Only blink in sub menu and only update single tile
-  if(sequencer.menu_layer == MENU_SUB) {
-      UINT8 current_blink_state = (sequencer.blink_counter > 15);
-      if(current_blink_state != last_blink_state) {
-          UINT8 x = (sequencer.current_step % 4) * 2 + GRID_START_X;
-          UINT8 y = (sequencer.current_step / 4) * 2 + GRID_START_Y;
-          UINT8 tile = current_blink_state ? TILE_BLANK : 
-              (sequencer.channels[sequencer.current_channel].steps[sequencer.current_step].armed ? 
-              TILE_ARMED : TILE_UNARMED);
-          
-          wait_vbl_done();
-          set_bkg_tile_xy(x, y, tile);
-          set_bkg_tile_xy(x + 1, y, tile);
-          set_bkg_tile_xy(x, y + 1, tile);
-          set_bkg_tile_xy(x + 1, y + 1, tile);
-          
-          last_blink_state = current_blink_state;
-      }
-  }
+    static UINT8 last_blink_state = 0;
+    static UINT8 last_playback_step = 0;
+    
+    sequencer.blink_counter++;
+    if(sequencer.blink_counter > 30) {
+        sequencer.blink_counter = 0;
+    }
+    
+    // Only update blinking step in sub menu
+    if(sequencer.menu_layer == MENU_SUB) {
+        UINT8 current_blink_state = (sequencer.blink_counter > 15);
+        if(current_blink_state != last_blink_state) {
+            update_step_visuals();
+            last_blink_state = current_blink_state;
+        }
+    }
   
   if(sequencer.is_playing) {
       sequencer.frame_counter++;
