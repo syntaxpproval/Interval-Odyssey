@@ -77,7 +77,7 @@ void draw_sequencer(void);
 void handle_sequencer_input(UINT8 joy);
 void cleanup_sequencer(void);
 void toggle_sequencer_debug(void);
-void draw_grid(void);
+void draw_sequence_display(void);
 const char* get_last_error(void);
 
 #define SEQ_ERR_NONE 0

@@ -46,7 +46,7 @@
 
 // Special tiles
 #define TILE_MUSICNOTE     95u
-#define TILE_STAR          96u
+#define TILE_STAR          32u  // Verified position in tileset
 
 // MetaTile structures
 typedef struct {

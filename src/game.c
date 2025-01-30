@@ -19,19 +19,22 @@
 #include "game_types.h"
 #include "text.h"
 #include "sequencer.h"
+#include "test_tiles.h"
 
 typedef enum {
     STATE_MENU,
     STATE_GAME,
     STATE_SETTINGS,
     STATE_MUSIC,
-    STATE_SEQUENCER
+    STATE_SEQUENCER,
+    STATE_DEBUG_TEST
 } GameState;
 
-#define NUM_MENU_ITEMS 3
+#define NUM_MENU_ITEMS 4  // Updated for debug menu
 #define MENU_PLAY 0
 #define MENU_SETTINGS 1
 #define MENU_MUSIC 2
+#define MENU_DEBUG 3  // New debug menu option
 
 GameState current_state = STATE_MENU;
 static GameState previous_state = STATE_MENU;
@@ -78,7 +81,8 @@ void draw_menu_screen(void) {
     const char* menu_items[] = {
         "PLAY GAME",
         "SETTINGS",
-        "MUSIC MODE"
+        "MUSIC MODE",
+        "DEBUG TEST"  // New debug menu item
     };
     
     for(UINT8 i = 0; i < NUM_MENU_ITEMS; i++) {
@@ -135,6 +139,10 @@ void handle_menu_input(UINT8 joy) {
                     init_sequencer();
                     needs_redraw = 0;  // Let sequencer handle draw
                     break;
+                case MENU_DEBUG:
+                    current_state = STATE_DEBUG_TEST;
+                    needs_redraw = 1;
+                    break;
             }
         }
         
@@ -172,10 +180,7 @@ void update_game_state(UINT8 joy) {
        previous_state = current_state;
    }
    
-   if (first_update && initial_seed != 0) {
-       char debug[32];
-       sprintf(debug, "INIT>%02x,%02x", rand_1, rand_2);
-       draw_text(0, 11, debug);
+   if (first_update) {
        first_update = 0;
    }
    
@@ -213,6 +218,19 @@ void update_game_state(UINT8 joy) {
            // Check for exit condition
            if(joy & J_START && joy & J_B) {
                cleanup_sequencer();
+               current_state = STATE_MENU;
+               needs_redraw = 1;
+           }
+           break;
+
+       case STATE_DEBUG_TEST:
+           if(needs_redraw) {
+               test_tile_definitions();
+               needs_redraw = 0;
+           }
+           update_test_animations();  // Update our animations
+           // Return to menu with B button
+           if(joy & J_B) {
                current_state = STATE_MENU;
                needs_redraw = 1;
            }

@@ -26,3 +26,9 @@ void draw_text(UINT8 x, UINT8 y, const char *text) {
 void draw_special_tile(UINT8 x, UINT8 y, UINT8 tile) {
    set_bkg_tile_xy(x, y, tile);
 }
+
+void draw_multi_tile(UINT8 x, UINT8 y, UINT8 start_tile, UINT8 length) {
+    for(UINT8 i = 0; i < length; i++) {
+        set_bkg_tile_xy(x + i, y, start_tile + i);
+    }
+}

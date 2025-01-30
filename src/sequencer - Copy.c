@@ -6,44 +6,19 @@
 
 SEQUENCER_DATA sequencer;
 
-// Function declarations
-static void update_parameter_display(void);
-static void update_bottom_info(void);
-static void safe_set_parameter(UINT8* param, UINT8 new_value, UINT8 min_val, UINT8 max_val);
-static void play_sequencer_note(UINT8 channel, UINT8 note_idx);
-static void stop_sequencer_note(UINT8 channel);
-static void calculate_frames_per_step(void);
-static void draw_debug_info(void);
-static void draw_layer_indicator(void);
-static void draw_main_menu(void);
-static void draw_tempo_indicator(void);
-static void draw_sub_menu(void);
-static void update_step_visuals(void);
-static void handle_main_menu_input(UINT8 joy);
-static void handle_sub_menu_input(UINT8 joy);
-
-
 // Display constants
 #define MAX_STATUS_LEN 20
 #define MAX_LABEL_LEN 8
+#define GRID_START_X 2
+#define GRID_START_Y 4
 
-// Sequencer display positions
-#define SEQ_START_X 2
-#define SEQ_START_Y 4
-#define SEQ_POSITION_Y 3  // Position indicator row above sequence bars
-#define PARAM_START_Y 9   // Parameters start below sequencer
+#define TILE_UNARMED 113
+#define TILE_ARMED   112
+#define TILE_BLANK   0
 
-// Tile definitions
-#define TILE_INACTIVE 47   // 'o' character from tileset
-#define TILE_ACTIVE 88     // 'x' character from tileset
-#define TILE_BLANK 0
-#define TILE_SELECTED 112  // Black tile for selected step
-
-// Channel identifiers
-#define TILE_CH1 TILE_ROMAN1
-#define TILE_CH2 TILE_ROMAN2
-#define TILE_CH3 TILE_ROMAN3
-#define TILE_CH4 TILE_ROMAN4
+#define TILE_POSITION_INACTIVE 'o'
+#define TILE_POSITION_ACTIVE 'x'
+#define POSITION_INDICATOR_ROW 12
 
 // Menu text
 const char* CHANNEL_NAMES[] = {"CHANNEL1", "CHANNEL2", "CHANNEL3", "CHANNEL4"};
@@ -154,7 +129,7 @@ static void draw_main_menu(void) {
         last_cursor = 255;
         last_tempo = 255;  // Force tempo update too
         
-        draw_sequence_display();  // Initial sequence display
+        draw_grid();  // Initial grid draw
     }
     
     // Update tempo display
@@ -193,46 +168,47 @@ static void draw_tempo_indicator(void) {
 }
 
 static void draw_sub_menu(void) {
-static UINT8 last_param = 255;  // Invalid value to force first draw
-static UINT8 last_step = 255;
-CHANNEL_DATA* channel = &sequencer.channels[sequencer.current_channel];
-SEQUENCER_STEP* step = &channel->steps[sequencer.current_step];
-
-// Only draw the full menu layout when first entering
-if(sequencer.needs_redraw) {
-    wait_vbl_done();
-fill_bkg_rect(0, PARAM_START_Y, 20, 8, 0);    // Clear parameter area
-fill_bkg_rect(16, 0, 4, 1, 0);      // Clear layer indicator
-
-draw_tempo_indicator();  // Add BPM display
-
-// Draw static parameter labels
-draw_text(2, PARAM_START_Y, "STEP    ");
-draw_text(2, PARAM_START_Y + 1, "NOTE    ");
-draw_text(2, PARAM_START_Y + 2, "ATTACK  ");
-draw_text(2, PARAM_START_Y + 3, "DECAY   ");
-draw_text(2, PARAM_START_Y + 4, "VOLUME  ");
-draw_text(2, PARAM_START_Y + 5, "TYPE    ");
-draw_text(2, PARAM_START_Y + 6, "MUTE CH ");
-draw_text(2, PARAM_START_Y + 7, "EXIT    ");
-
-draw_sequence_display();
-last_param = 255;  // Force parameter update
-}
-
-// Update parameter cursor only if changed
-if(last_param != sequencer.current_parameter) {
-    wait_vbl_done();
-if(last_param < PARAM_COUNT) {
-    draw_text(0, PARAM_START_Y + last_param, " ");
-}
-draw_text(0, PARAM_START_Y + sequencer.current_parameter, ">");
-last_param = sequencer.current_parameter;
-
-// Update parameter value and bottom info
-update_parameter_display();
-update_bottom_info();
-}
+    static UINT8 last_param = 255;  // Invalid value to force first draw
+    static UINT8 last_step = 255;
+    UINT8 menu_start_y = 4;
+    CHANNEL_DATA* channel = &sequencer.channels[sequencer.current_channel];
+    SEQUENCER_STEP* step = &channel->steps[sequencer.current_step];
+    
+    // Only draw the full menu layout when first entering
+    if(sequencer.needs_redraw) {
+        wait_vbl_done();
+        fill_bkg_rect(10, 4, 10, 14, 0);    // Clear menu area
+        fill_bkg_rect(16, 0, 4, 1, 0);      // Clear layer indicator
+		
+		draw_tempo_indicator();  // Add BPM display
+        
+        // Draw static parameter labels
+        draw_text(10, menu_start_y, "STEP    ");
+        draw_text(10, menu_start_y + 1, "NOTE    ");
+        draw_text(10, menu_start_y + 2, "ATTACK  ");
+        draw_text(10, menu_start_y + 3, "DECAY   ");
+        draw_text(10, menu_start_y + 4, "VOLUME  ");
+        draw_text(10, menu_start_y + 5, "TYPE    ");
+        draw_text(10, menu_start_y + 6, "MUTE CH ");
+        draw_text(10, menu_start_y + 7, "EXIT    ");
+        
+        draw_grid();
+        last_param = 255;  // Force parameter update
+    }
+    
+    // Update parameter cursor only if changed
+    if(last_param != sequencer.current_parameter) {
+        wait_vbl_done();
+        if(last_param < PARAM_COUNT) {
+            draw_text(18, menu_start_y + last_param, " ");
+        }
+        draw_text(18, menu_start_y + sequencer.current_parameter, ">");
+        last_param = sequencer.current_parameter;
+        
+        // Update parameter value and bottom info
+        update_parameter_display();
+        update_bottom_info();
+    }
 }
 
 // New helper function for bottom info updates
@@ -257,34 +233,32 @@ static void update_bottom_info(void) {
     draw_text(0, 17, buffer);
 }
 
-void draw_sequence_display(void) {
-    // Clear sequence display area
+void draw_grid(void) {
+    UINT8 grid_start_y = 4;
+    UINT8 block_tiles[4];  // Buffer for 2x2 tile block
+    
     wait_vbl_done();
-    fill_bkg_rect(SEQ_START_X, SEQ_START_Y, 16, 4, TILE_BLANK);
+    fill_bkg_rect(0, grid_start_y, 10, 16, 0);
     
-    // Draw channel identifiers
-    draw_special_tile(0, SEQ_START_Y, TILE_CH1);
-    draw_special_tile(0, SEQ_START_Y + 1, TILE_CH2);
-    draw_special_tile(0, SEQ_START_Y + 2, TILE_CH3);
-    draw_special_tile(0, SEQ_START_Y + 3, TILE_CH4);
+    CHANNEL_DATA* current_channel = &sequencer.channels[sequencer.current_channel];
     
-    // Draw sequence steps for each channel
-    for(UINT8 ch = 0; ch < SEQ_NUM_CHANNELS; ch++) {
-        CHANNEL_DATA* channel = &sequencer.channels[ch];
-        for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
-            UINT8 x = SEQ_START_X + step;
-            UINT8 y = SEQ_START_Y + ch;
-            UINT8 tile = channel->steps[step].armed ? TILE_ACTIVE : TILE_INACTIVE;
-            draw_special_tile(x, y, tile);
-        }
-    }
-    
-    // Draw position indicator
     for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
-        UINT8 x = SEQ_START_X + step;
-        draw_special_tile(x, SEQ_POSITION_Y, TILE_BLANK);
+        UINT8 x = (step % 4) * 2 + GRID_START_X;
+        UINT8 y = (step / 4) * 2 + grid_start_y;
+        UINT8 is_current = (step == sequencer.current_step);
+        UINT8 tile = current_channel->steps[step].armed ? TILE_ARMED : TILE_UNARMED;
+        
+        if (is_current && sequencer.blink_counter > 15) {
+            tile = TILE_BLANK;
+        }
+        
+        // Fill the block buffer
+        memset(block_tiles, tile, 4);
+        
+        wait_vbl_done();
+        // Update all 4 tiles at once
+        set_bkg_tiles(x, y, 2, 2, block_tiles);
     }
-    draw_special_tile(SEQ_START_X + sequencer.playback_step, SEQ_POSITION_Y, TILE_RIGHT_ARROW);
 }
 
 void draw_sequencer(void) {
@@ -490,12 +464,14 @@ static void handle_sub_menu_input(UINT8 joy) {
        switch(sequencer.current_parameter) {
            case PARAM_STEP: {
                channel->steps[sequencer.current_step].armed ^= 1;
-               UINT8 x = SEQ_START_X + sequencer.current_step;
-               UINT8 y = SEQ_START_Y + sequencer.current_channel;
-               UINT8 tile = channel->steps[sequencer.current_step].armed ? TILE_ACTIVE : TILE_INACTIVE;
+               UINT8 block_tiles[4];
+               UINT8 x = (sequencer.current_step % 4) * 2 + GRID_START_X;
+               UINT8 y = (sequencer.current_step / 4) * 2 + 4;
+               UINT8 tile = channel->steps[sequencer.current_step].armed ? TILE_ARMED : TILE_UNARMED;
                
+               memset(block_tiles, tile, 4);
                wait_vbl_done();
-               draw_special_tile(x, y, tile);
+               set_bkg_tiles(x, y, 2, 2, block_tiles);
                update_bottom_info();
                break;
            }
@@ -529,12 +505,8 @@ void handle_sequencer_input(UINT8 joy) {
         } else if(joy & J_START) {
             sequencer.is_playing ^= 1;
             if(!sequencer.is_playing) {
-                // Clear previous position indicator
-                draw_special_tile(SEQ_START_X + sequencer.playback_step, SEQ_POSITION_Y, TILE_BLANK);
                 sequencer.playback_step = 0;
                 sequencer.frame_counter = 0;
-                // Draw position indicator at start
-                draw_special_tile(SEQ_START_X, SEQ_POSITION_Y, TILE_RIGHT_ARROW);
                 for(UINT8 ch = 0; ch < 2; ch++) {
                     stop_sequencer_note(ch);
                 }
@@ -554,67 +526,65 @@ void handle_sequencer_input(UINT8 joy) {
 }
 
 static void update_step_visuals(void) {
-    static UINT8 last_step = 255;
-    static UINT8 last_channel = 255;
+    UINT8 x = (sequencer.current_step % 4) * 2 + GRID_START_X;
+    UINT8 y = (sequencer.current_step / 4) * 2 + GRID_START_Y;
+    UINT8 tile = (sequencer.blink_counter > 15) ? TILE_BLANK : 
+        (sequencer.channels[sequencer.current_channel].steps[sequencer.current_step].armed ? 
+        TILE_ARMED : TILE_UNARMED);
     
-    // Clear previous selection if changing step/channel
-    if(last_step != 255 && last_channel != 255 &&
-       (last_step != sequencer.current_step || last_channel != sequencer.current_channel)) {
-        UINT8 old_x = SEQ_START_X + last_step;
-        UINT8 old_y = SEQ_START_Y + last_channel;
-        UINT8 old_tile = sequencer.channels[last_channel].steps[last_step].armed ? 
-            TILE_ACTIVE : TILE_INACTIVE;
-        draw_special_tile(old_x, old_y, old_tile);
-    }
-    
-    // Draw new selection
-    UINT8 x = SEQ_START_X + sequencer.current_step;
-    UINT8 y = SEQ_START_Y + sequencer.current_channel;
+    UINT8 block_tiles[4];
+    memset(block_tiles, tile, 4);
     
     wait_vbl_done();
-    draw_special_tile(x, y, TILE_SELECTED);
-    
-    last_step = sequencer.current_step;
-    last_channel = sequencer.current_channel;
+    set_bkg_tiles(x, y, 2, 2, block_tiles);
 }
 
 void update_sequencer(void) {
+    static UINT8 last_blink_state = 0;
     static UINT8 last_playback_step = 0;
     
-    if(sequencer.is_playing) {
-        sequencer.frame_counter++;
-        if(sequencer.frame_counter >= sequencer.frames_per_step) {
-            sequencer.frame_counter = 0;
-            
-            // Update position indicator
-            draw_special_tile(SEQ_START_X + last_playback_step, SEQ_POSITION_Y, TILE_BLANK);
-            
-            sequencer.playback_step++;
-            if(sequencer.playback_step >= SEQ_MAX_STEPS) {
-                sequencer.playback_step = 0;
-            }
-            
-            draw_special_tile(SEQ_START_X + sequencer.playback_step, SEQ_POSITION_Y, TILE_RIGHT_ARROW);
-            last_playback_step = sequencer.playback_step;
-            
-            // Play notes for each enabled channel
-            for(UINT8 ch = 0; ch < 2; ch++) {
-                if(sequencer.channels[ch].enabled && 
-                   !sequencer.channels[ch].muted &&
-                   sequencer.channels[ch].steps[sequencer.playback_step].armed) {
-                    play_sequencer_note(ch, sequencer.channels[ch].steps[sequencer.playback_step].note);
-                } else {
-                    stop_sequencer_note(ch);
-                }
-            }
-        }
+    sequencer.blink_counter++;
+    if(sequencer.blink_counter > 30) {
+        sequencer.blink_counter = 0;
     }
     
-    // Only do full redraw when explicitly needed
-    if(sequencer.needs_redraw) {
-        draw_sequencer();
-        sequencer.needs_redraw = 0;
+    // Only update blinking step in sub menu
+    if(sequencer.menu_layer == MENU_SUB) {
+        UINT8 current_blink_state = (sequencer.blink_counter > 15);
+        if(current_blink_state != last_blink_state) {
+            update_step_visuals();
+            last_blink_state = current_blink_state;
+        }
     }
+  
+  if(sequencer.is_playing) {
+      sequencer.frame_counter++;
+      if(sequencer.frame_counter >= sequencer.frames_per_step) {
+          sequencer.frame_counter = 0;
+          
+          sequencer.playback_step++;
+          if(sequencer.playback_step >= SEQ_MAX_STEPS) {
+              sequencer.playback_step = 0;
+          }
+          
+          // Play notes for each enabled channel
+          for(UINT8 ch = 0; ch < 2; ch++) {
+              if(sequencer.channels[ch].enabled && 
+                 !sequencer.channels[ch].muted &&
+                 sequencer.channels[ch].steps[sequencer.playback_step].armed) {
+                  play_sequencer_note(ch, sequencer.channels[ch].steps[sequencer.playback_step].note);
+              } else {
+                  stop_sequencer_note(ch);
+              }
+          }
+      }
+  }
+  
+  // Only do full redraw when explicitly needed
+  if(sequencer.needs_redraw) {
+      draw_sequencer();
+      sequencer.needs_redraw = 0;
+  }
 }
 
 void init_sequencer(void) {
@@ -652,7 +622,7 @@ void init_sequencer(void) {
    NR50_REG = 0x77;  // Full volume
    NR51_REG = 0xFF;  // Enable all channels
    
-   draw_sequence_display();
+   draw_grid();
    draw_main_menu();
 }
 
