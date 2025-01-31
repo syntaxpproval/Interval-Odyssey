@@ -85,31 +85,63 @@ static void play_sequencer_note(UINT8 channel, UINT8 note_idx) {
     
     UINT16 freq = get_note_frequency(note_idx);
     
+    // Get current step's envelope parameters
+    SEQUENCER_STEP* step = &sequencer.channels[channel].steps[sequencer.playback_step];
+    
+    // Configure envelope based on attack/decay
+    UINT8 envelope;
+    if(step->attack > 0) {
+        // Attack mode: Start quiet and increase
+        envelope = (0x00 << 4) |     // Initial volume = 0
+                  (0x08) |           // Direction = up
+                  ((step->attack & 0x07) + 1); // Step length 1-7
+        
+        // Set duration for envelope tracking
+        sequencer.envelope_duration[channel] = (step->attack * 8) + (step->decay * 8);
+    } else {
+        // No attack: Start at full volume
+        envelope = (0x0F << 4);      // Initial volume = 15
+        
+        if(step->decay > 0) {
+            envelope |= (0x00) |      // Direction = down
+                       ((step->decay & 0x07) + 1); // Step length 1-7
+        } else {
+            envelope |= 0x00;         // No envelope change
+        }
+        sequencer.envelope_duration[channel] = 0; // No tracking needed
+    }
+    
     switch(channel) {
         case 0: // Channel 1 - 50% duty cycle
-            NR10_REG = 0x00;
+            NR10_REG = 0x00;  // No sweep
             NR11_REG = CH2_DUTY_50 | 0x3F;
-            NR12_REG = 0xF3;
+            NR12_REG = envelope;
             NR13_REG = (UINT8)(freq & 0xFF);
-            NR14_REG = 0x86 | ((freq >> 8) & 0x07);
+            NR14_REG = 0x80 | ((freq >> 8) & 0x07);
             break;
             
         case 1: // Channel 2 - 25% duty cycle
             NR21_REG = CH2_DUTY_25 | 0x3F;
-            NR22_REG = 0xF3;
+            NR22_REG = envelope;
             NR23_REG = (UINT8)(freq & 0xFF);
-            NR24_REG = 0x86 | ((freq >> 8) & 0x07);
+            NR24_REG = 0x80 | ((freq >> 8) & 0x07);
             break;
     }
 }
 
 static void stop_sequencer_note(UINT8 channel) {
+   // Get current step for decay settings
+   SEQUENCER_STEP* step = &sequencer.channels[channel].steps[sequencer.playback_step];
+   UINT8 decay = step->decay & 0x07;
+   
    switch(channel) {
        case 0:
-           NR12_REG = 0x00;
+           // Set envelope to decay only
+           NR12_REG = decay;
            break;
        case 1:
-           NR22_REG = 0x00;
+           // Set envelope to decay only
+           NR22_REG = decay;
            break;
    }
 }
@@ -459,11 +491,22 @@ static void handle_sub_menu_input(UINT8 joy) {
                break;
                
            case PARAM_ATTACK:
-               safe_set_parameter(&step->attack, step->attack + delta, 0, SEQ_MAX_ADSR);
+               {
+                   UINT8 new_attack = step->attack + delta;
+                   if(new_attack <= 6) { // Limit to 0-6 range
+                       step->attack = new_attack;
+                   }
+               }
                break;
                
            case PARAM_DECAY:
-               safe_set_parameter(&step->decay, step->decay + delta, 0, SEQ_MAX_ADSR);
+               {
+                   UINT8 new_decay = step->decay + delta;
+                   // Ensure decay stays between 1-6
+                   if(new_decay >= 1 && new_decay <= 6) {
+                       step->decay = new_decay;
+                   }
+               }
                break;
                
            case PARAM_VOLUME:
@@ -596,12 +639,25 @@ void update_sequencer(void) {
             
             // Play notes for each enabled channel
             for(UINT8 ch = 0; ch < 2; ch++) {
-                if(sequencer.channels[ch].enabled && 
-                   !sequencer.channels[ch].muted &&
-                   sequencer.channels[ch].steps[sequencer.playback_step].armed) {
-                    play_sequencer_note(ch, sequencer.channels[ch].steps[sequencer.playback_step].note);
-                } else {
-                    stop_sequencer_note(ch);
+                CHANNEL_DATA* channel = &sequencer.channels[ch];
+                SEQUENCER_STEP* current_step = &channel->steps[sequencer.playback_step];
+                SEQUENCER_STEP* prev_step = &channel->steps[(sequencer.playback_step + SEQ_MAX_STEPS - 1) % SEQ_MAX_STEPS];
+                
+                if(channel->enabled && !channel->muted) {
+                    if(current_step->armed) {
+                        // New note is starting, stop any previous note
+                        if(prev_step->armed) {
+                            stop_sequencer_note(ch);
+                        }
+                        play_sequencer_note(ch, current_step->note);
+                    }
+                    // Check if we need to stop note due to envelope duration
+                    else if(sequencer.envelope_duration[ch] > 0) {
+                        sequencer.envelope_duration[ch]--;
+                        if(sequencer.envelope_duration[ch] == 0) {
+                            stop_sequencer_note(ch);
+                        }
+                    }
                 }
             }
         }
@@ -639,8 +695,8 @@ void init_sequencer(void) {
            sequencer.channels[ch].steps[i].armed = 0;
            sequencer.channels[ch].steps[i].note = 24;  // C5
            sequencer.channels[ch].steps[i].volume = 15;
-           sequencer.channels[ch].steps[i].attack = 5;
-           sequencer.channels[ch].steps[i].decay = 5;
+           sequencer.channels[ch].steps[i].attack = 0;
+           sequencer.channels[ch].steps[i].decay = 1;
        }
    }
    

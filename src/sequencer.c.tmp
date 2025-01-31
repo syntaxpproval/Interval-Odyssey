@@ -1,0 +1,49 @@
+static void play_sequencer_note(UINT8 channel, UINT8 note_idx) {
+    // Skip if channel is muted
+    if(sequencer.channels[channel].muted) return;
+    
+    if(note_idx > SEQ_MAX_NOTE) return;
+    
+    UINT16 freq = get_note_frequency(note_idx);
+    
+    // Get current step's envelope parameters
+    SEQUENCER_STEP* step = &sequencer.channels[channel].steps[sequencer.playback_step];
+    
+    // Configure envelope based on attack (0-6) and decay (1-6)
+    UINT8 envelope;
+    if(step->attack > 0) {
+        // Attack mode: Start quiet and increase
+        envelope = (0x00 << 4) |     // Initial volume = 0
+                  (0x08) |           // Direction = up
+                  ((step->attack & 0x07) + 1); // Step length 1-7
+    } else {
+        // No attack: Start at full volume
+        envelope = (0x0F << 4);      // Initial volume = 15
+        
+        if(step->decay > 0) {
+            // Apply decay if set
+            envelope |= (0x00) |      // Direction = down
+                       ((step->decay & 0x07) + 1); // Step length 1-7
+        } else {
+            // No decay: maintain volume
+            envelope |= 0x00;         // No envelope change
+        }
+    }
+    
+    switch(channel) {
+        case 0: // Channel 1 - 50% duty cycle
+            NR10_REG = 0x00;  // No sweep
+            NR11_REG = CH2_DUTY_50 | 0x3F;
+            NR12_REG = envelope;
+            NR13_REG = (UINT8)(freq & 0xFF);
+            NR14_REG = 0x80 | ((freq >> 8) & 0x07); // Trigger only, no length enable
+            break;
+            
+        case 1: // Channel 2 - 25% duty cycle
+            NR21_REG = CH2_DUTY_25 | 0x3F;
+            NR22_REG = envelope;
+            NR23_REG = (UINT8)(freq & 0xFF);
+            NR24_REG = 0x80 | ((freq >> 8) & 0x07); // Trigger only, no length enable
+            break;
+    }
+}
