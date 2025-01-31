@@ -142,12 +142,11 @@ static void draw_main_menu(void) {
     // Only draw the channels and layout once when entering this menu
     if(sequencer.needs_redraw) {
         wait_vbl_done();
-        fill_bkg_rect(10, 0, 10, 1, 0);     // Only clear the top area for layer
-        fill_bkg_rect(10, 4, 10, 14, 0);    // Clear menu area specifically
+        fill_bkg_rect(0, PARAM_START_Y, 20, 8, 0);    // Clear parameter area
         
-        // Draw channels (only once)
+        // Draw channels at parameter area
         for(UINT8 i = 0; i < 4; i++) {
-            draw_text(10, menu_start_y + i, CHANNEL_NAMES[i]);
+            draw_text(2, PARAM_START_Y + i, CHANNEL_NAMES[i]);
         }
         
         // Force cursor update on redraw
@@ -160,10 +159,10 @@ static void draw_main_menu(void) {
     // Update tempo display
     if(last_tempo != sequencer.tempo) {
         wait_vbl_done();
-        fill_bkg_rect(10, menu_start_y + 4, 8, 1, 0);  // Clear just tempo area
+        fill_bkg_rect(0, 0, 8, 1, 0);  // Clear just left tempo area
         char buffer[12];
-        sprintf(buffer, "BPM=%u", sequencer.tempo);  // Changed to BPM=
-        draw_text(10, menu_start_y + 4, buffer);
+        sprintf(buffer, "BPM=%u", sequencer.tempo);
+        draw_text(0, 0, buffer);  // Keep tempo in top left
         last_tempo = sequencer.tempo;
     }
     
@@ -172,11 +171,11 @@ static void draw_main_menu(void) {
         wait_vbl_done();
         // Clear all possible cursor positions first
         for(UINT8 i = 0; i <= 4; i++) {
-            draw_text(18, menu_start_y + i, " ");
+            draw_text(0, PARAM_START_Y + i, " ");
         }
         // Draw new cursor
         if(sequencer.cursor <= 4) {
-            draw_text(18, menu_start_y + sequencer.cursor, ">");
+            draw_text(0, PARAM_START_Y + sequencer.cursor, ">");
         }
         last_cursor = sequencer.cursor;
     }
@@ -193,43 +192,42 @@ static void draw_tempo_indicator(void) {
 }
 
 static void draw_sub_menu(void) {
-static UINT8 last_param = 255;  // Invalid value to force first draw
-static UINT8 last_step = 255;
+static UINT8 last_param = 255;
 CHANNEL_DATA* channel = &sequencer.channels[sequencer.current_channel];
-SEQUENCER_STEP* step = &channel->steps[sequencer.current_step];
 
 // Only draw the full menu layout when first entering
 if(sequencer.needs_redraw) {
     wait_vbl_done();
-fill_bkg_rect(0, PARAM_START_Y, 20, 8, 0);    // Clear parameter area
+    fill_bkg_rect(0, PARAM_START_Y, 20, 8, 0);    // Clear parameter area
 fill_bkg_rect(16, 0, 4, 1, 0);      // Clear layer indicator
 
-draw_tempo_indicator();  // Add BPM display
+    draw_tempo_indicator();  // Add BPM display
 
-// Draw static parameter labels
-draw_text(2, PARAM_START_Y, "STEP    ");
-draw_text(2, PARAM_START_Y + 1, "NOTE    ");
-draw_text(2, PARAM_START_Y + 2, "ATTACK  ");
-draw_text(2, PARAM_START_Y + 3, "DECAY   ");
-draw_text(2, PARAM_START_Y + 4, "VOLUME  ");
-draw_text(2, PARAM_START_Y + 5, "TYPE    ");
-draw_text(2, PARAM_START_Y + 6, "MUTE CH ");
-draw_text(2, PARAM_START_Y + 7, "EXIT    ");
+    // Draw static parameter labels
+    draw_text(2, PARAM_START_Y, "STEP    ");
+    draw_text(2, PARAM_START_Y + 1, "NOTE    ");
+    draw_text(2, PARAM_START_Y + 2, "ATTACK  ");
+    draw_text(2, PARAM_START_Y + 3, "DECAY   ");
+    draw_text(2, PARAM_START_Y + 4, "VOLUME  ");
+    draw_text(2, PARAM_START_Y + 5, "TYPE    ");
+    draw_text(2, PARAM_START_Y + 6, "MUTE CH ");
+    draw_text(2, PARAM_START_Y + 7, "EXIT    ");
 
-draw_sequence_display();
-last_param = 255;  // Force parameter update
+    draw_sequence_display();
+    last_param = 255;  // Force parameter update
 }
 
 // Update parameter cursor only if changed
 if(last_param != sequencer.current_parameter) {
     wait_vbl_done();
-if(last_param < PARAM_COUNT) {
-    draw_text(0, PARAM_START_Y + last_param, " ");
+    // Clear old cursor position
+for(UINT8 i = 0; i < PARAM_COUNT; i++) {
+    draw_text(0, PARAM_START_Y + i, " ");
 }
+// Draw new cursor
 draw_text(0, PARAM_START_Y + sequencer.current_parameter, ">");
 last_param = sequencer.current_parameter;
 
-// Update parameter value and bottom info
 update_parameter_display();
 update_bottom_info();
 }
@@ -263,10 +261,10 @@ void draw_sequence_display(void) {
     fill_bkg_rect(SEQ_START_X, SEQ_START_Y, 16, 4, TILE_BLANK);
     
     // Draw channel identifiers
-    draw_special_tile(0, SEQ_START_Y, TILE_CH1);
-    draw_special_tile(0, SEQ_START_Y + 1, TILE_CH2);
-    draw_special_tile(0, SEQ_START_Y + 2, TILE_CH3);
-    draw_special_tile(0, SEQ_START_Y + 3, TILE_CH4);
+    draw_special_tile(1, SEQ_START_Y, TILE_CH1);
+    draw_special_tile(1, SEQ_START_Y + 1, TILE_CH2);
+    draw_special_tile(1, SEQ_START_Y + 2, TILE_CH3);
+    draw_special_tile(1, SEQ_START_Y + 3, TILE_CH4);
     
     // Draw sequence steps for each channel
     for(UINT8 ch = 0; ch < SEQ_NUM_CHANNELS; ch++) {
@@ -349,9 +347,8 @@ static void update_parameter_display(void) {
     // Only update if value changed
     if(current_value != last_value || sequencer.needs_redraw) {
         wait_vbl_done();
-        fill_bkg_rect(0, 14, 20, 1, 0);
-        UINT8 x_pos = (20 - strlen(value_buffer)) / 2;
-        draw_text(x_pos, 14, value_buffer);
+        fill_bkg_rect(10, 0, 10, 1, 0);  // Clear top right area
+        draw_text(10, 0, value_buffer);  // Draw in top right, moved left
         last_value = current_value;
     }
 }
@@ -423,9 +420,9 @@ static void handle_sub_menu_input(UINT8 joy) {
        }
        
        // Update cursor and value
-       UINT8 menu_start_y = 4;
-       draw_text(18, menu_start_y + sequencer.last_parameter, " ");
-       draw_text(18, menu_start_y + sequencer.current_parameter, ">");
+       wait_vbl_done();
+       draw_text(0, PARAM_START_Y + sequencer.last_parameter, " ");
+       draw_text(0, PARAM_START_Y + sequencer.current_parameter, ">");
        
        update_parameter_display();
        update_bottom_info();
@@ -440,9 +437,9 @@ static void handle_sub_menu_input(UINT8 joy) {
            sequencer.current_parameter++;
        }
        
-       UINT8 menu_start_y = 4;
-       draw_text(18, menu_start_y + sequencer.last_parameter, " ");
-       draw_text(18, menu_start_y + sequencer.current_parameter, ">");
+       wait_vbl_done();
+       draw_text(0, PARAM_START_Y + sequencer.last_parameter, " ");
+       draw_text(0, PARAM_START_Y + sequencer.current_parameter, ">");
        
        update_parameter_display();
        update_bottom_info();
