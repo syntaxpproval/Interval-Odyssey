@@ -27,6 +27,64 @@ void init_sound(void) {
     NR52_REG = 0x80;
     NR50_REG = 0x77;
     NR51_REG = 0xFF;
+    init_wave_ram();
+}
+
+void init_wave_ram(void) {
+    // Disable channel 3 before writing to wave RAM
+    NR30_REG = 0x00;
+    
+    // Initialize with simple triangle wave pattern
+    // Each byte contains two 4-bit samples
+    const UINT8 wave_pattern[] = {
+        0x01, 0x23, 0x45, 0x67,
+        0x89, 0xAB, 0xCD, 0xEF,
+        0xFE, 0xDC, 0xBA, 0x98,
+        0x76, 0x54, 0x32, 0x10
+    };
+    
+    // Write pattern to wave RAM ($FF30-FF3F)
+    for(UINT8 i = 0; i < 16; i++) {
+        *((UINT8*)(0xFF30 + i)) = wave_pattern[i];
+    }
+}
+
+void set_ch3_volume(UINT8 volume_code) {
+    // Volume codes:
+    // 0 = Mute (0%)
+    // 1 = Full (100%)
+    // 2 = Half (50%)
+    // 3 = Quarter (25%)
+    
+    // Volume control is bits 5-6 of NR32 (0xFF1C)
+    // We shift volume_code to correct position
+    NR32_REG = (volume_code & 0x03) << 5;
+}
+
+void stop_note_ch3(void) {
+    // Disable channel 3
+    NR30_REG = 0x00;
+    
+    // Clear frequency registers
+    NR33_REG = 0x00;
+    NR34_REG = 0x00;
+}
+
+void play_note_ch3(UINT8 note_idx, UINT8 volume) {
+    UINT16 freq = get_note_frequency(note_idx);
+    
+    // First stop any current sound
+    stop_note_ch3();
+    
+    // Set volume (0-3)
+    set_ch3_volume(volume & 0x03);
+    
+    // Enable channel 3
+    NR30_REG = 0x80;
+    
+    // Set frequency (11 bits split across two registers)
+    NR33_REG = (UINT8)(freq & 0xFF);         // Lower 8 bits
+    NR34_REG = 0x80 | ((freq >> 8) & 0x07);  // Upper 3 bits + trigger bit
 }
 
 void play_key_pickup(void) {

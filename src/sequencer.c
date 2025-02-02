@@ -48,7 +48,7 @@ static void handle_sub_menu_input(UINT8 joy);
 // Menu text
 const char* CHANNEL_NAMES[] = {"CHANNEL1", "CHANNEL2", "CHANNEL3", "CHANNEL4"};
 const char* PARAM_LABELS[] = {"S:", "N:", "A:", "D:", "V:", "T:"};
-const char* TYPE_NAMES[] = {"SQUARE"};
+const char* TYPE_NAMES[] = {"SQUARE", "WAVE", "NOISE"};
 const char* LAYER_NAMES[] = {"MAIN", "SUB"};
 
 const char* NOTE_NAMES[] = {
@@ -126,6 +126,63 @@ static void play_sequencer_note(UINT8 channel, UINT8 note_idx) {
             NR23_REG = (UINT8)(freq & 0xFF);
             NR24_REG = 0x80 | ((freq >> 8) & 0x07);
             break;
+            
+        case 2: // Channel 3 - Wave
+        NR30_REG = 0x80;  // Enable wave channel
+        
+        // Handle decay values
+        UINT8 length_value;
+        if(step->decay == 0) {
+        length_value = 0;  // Maximum length
+        } else {
+        // Set explicit lengths for each decay value (256-value)/256 seconds
+        // Higher decay = longer time
+        switch(step->decay) {
+        case 1: length_value = 128;   // ~0.75s - shortest
+        break;
+        case 2: length_value = 48;   // ~0.81s
+        break;
+        case 3: length_value = 32;   // ~0.875s
+        break;
+        case 4: length_value = 24;   // ~0.91s
+        break;
+        case 5: length_value = 16;   // ~0.94s
+        break;
+        case 6: length_value = 8;    // ~0.97s - longest
+        break;
+        default: length_value = 128;  // Fallback to shortest
+        }
+        }
+        NR31_REG = length_value;
+        
+        // Set initial volume based on attack
+        UINT8 vol_code;
+        if(step->attack > 0) {
+            vol_code = 0x60;  // 25% volume to start
+        } else {
+            vol_code = 0x20;  // 100% volume
+        }
+        NR32_REG = vol_code;
+        
+        NR33_REG = (UINT8)(freq & 0xFF);
+        // Enable length counter (bit 6) and trigger note (bit 7)
+        NR34_REG = 0xC0 | ((freq >> 8) & 0x07);
+        break;
+            
+        case 3: // Channel 4 - Noise
+            // Configure envelope like channels 1 & 2
+            NR42_REG = envelope;
+            
+            // Map note value to noise frequency
+            // note range 9-67 maps to full noise range
+            UINT8 shift = (note_idx - SEQ_MIN_NOTE) >> 3;  // 0-7 shift values
+            UINT8 divisor = (note_idx - SEQ_MIN_NOTE) & 0x07;  // 0-7 divisor
+            NR43_REG = (shift << 4) | divisor;
+            
+            // Set length and trigger sound
+            NR41_REG = 0;  // No length limit
+            NR44_REG = 0x80;  // Trigger sound
+            break;
     }
 }
 
@@ -142,6 +199,16 @@ static void stop_sequencer_note(UINT8 channel) {
        case 1:
            // Set envelope to decay only
            NR22_REG = decay;
+           break;
+       case 2:
+           // Stop wave by setting length to max and enabling length counter
+           NR31_REG = 0xFF;
+           NR34_REG = 0x40;  // Enable length counter (bit 6)
+           break;
+           
+       case 3:
+           // Set envelope to decay only like channels 1 & 2
+           NR42_REG = decay;
            break;
    }
 }
@@ -575,7 +642,7 @@ void handle_sequencer_input(UINT8 joy) {
                 sequencer.frame_counter = 0;
                 // Draw position indicator at start
                 draw_special_tile(SEQ_START_X, SEQ_POSITION_Y, TILE_RIGHT_ARROW);
-                for(UINT8 ch = 0; ch < 2; ch++) {
+                for(UINT8 ch = 0; ch < 4; ch++) {
                     stop_sequencer_note(ch);
                 }
             }
@@ -638,7 +705,7 @@ void update_sequencer(void) {
             last_playback_step = sequencer.playback_step;
             
             // Play notes for each enabled channel
-            for(UINT8 ch = 0; ch < 2; ch++) {
+            for(UINT8 ch = 0; ch < 4; ch++) {
                 CHANNEL_DATA* channel = &sequencer.channels[ch];
                 SEQUENCER_STEP* current_step = &channel->steps[sequencer.playback_step];
                 SEQUENCER_STEP* prev_step = &channel->steps[(sequencer.playback_step + SEQ_MAX_STEPS - 1) % SEQ_MAX_STEPS];
@@ -684,7 +751,7 @@ void init_sequencer(void) {
    
    calculate_frames_per_step();
    
-   // Initialize both channels
+   // Initialize first two channels as square waves
    for(UINT8 ch = 0; ch < 2; ch++) {
        sequencer.channels[ch].enabled = 1;
        sequencer.channels[ch].type = TYPE_SQUARE;
@@ -700,6 +767,30 @@ void init_sequencer(void) {
        }
    }
    
+   // Initialize channel 3 as wave
+   sequencer.channels[2].enabled = 1;
+   sequencer.channels[2].type = TYPE_WAVE;
+   sequencer.channels[2].muted = 0;
+   for(UINT8 i = 0; i < SEQ_MAX_STEPS; i++) {
+       sequencer.channels[2].steps[i].armed = 0;
+       sequencer.channels[2].steps[i].note = 24;  // C5
+       sequencer.channels[2].steps[i].volume = 15;
+       sequencer.channels[2].steps[i].attack = 0;
+       sequencer.channels[2].steps[i].decay = 1;
+   }
+
+   // Initialize channel 4 as noise
+   sequencer.channels[3].enabled = 1;
+   sequencer.channels[3].type = TYPE_NOISE;
+   sequencer.channels[3].muted = 0;
+   for(UINT8 i = 0; i < SEQ_MAX_STEPS; i++) {
+       sequencer.channels[3].steps[i].armed = 0;
+       sequencer.channels[3].steps[i].note = 24;  // We'll use note for noise frequency
+       sequencer.channels[3].steps[i].volume = 15;
+       sequencer.channels[3].steps[i].attack = 0;
+       sequencer.channels[3].steps[i].decay = 1;
+   }
+   
    // Initialize sound hardware
    NR52_REG = 0x80;  // Sound on
    NR50_REG = 0x77;  // Full volume
@@ -713,7 +804,7 @@ void cleanup_sequencer(void) {
    wait_vbl_done();
    fill_bkg_rect(0, 0, 20, 18, 0);
    
-   for(UINT8 ch = 0; ch < 2; ch++) {
+   for(UINT8 ch = 0; ch < 4; ch++) {
        stop_sequencer_note(ch);
    }
 }
