@@ -202,7 +202,7 @@ void play_sound(UINT8 sound_id) {
     }
 }
 
-void play_note_ch2(UINT8 note_idx, UINT8 volume, UINT8 duty) {
+void play_note_ch2(UINT8 note_idx, UINT8 volume) {
    UINT16 freq = get_note_frequency(note_idx);
    
    NR21_REG = CH2_DUTY_25 | 0x3F;     // Using 25% duty cycle

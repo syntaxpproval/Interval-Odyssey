@@ -126,7 +126,7 @@ void play_menu_sound(void);
 void play_gate_open(void);
 void play_victory_sound(void);
 const char* get_chord_name(ChordType chord);
-void play_note_ch2(UINT8 note_idx, UINT8 volume, UINT8 duty);
+void play_note_ch2(UINT8 note_idx, UINT8 volume);
 void stop_note_ch2(void);
 void set_ch2_envelope(UINT8 attack, UINT8 decay);
 

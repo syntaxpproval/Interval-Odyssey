@@ -48,7 +48,7 @@ static void handle_sub_menu_input(UINT8 joy);
 // Menu text
 const char* CHANNEL_NAMES[] = {"CHANNEL1", "CHANNEL2", "CHANNEL3", "CHANNEL4"};
 const char* PARAM_LABELS[] = {"S:", "N:", "A:", "D:", "V:", "T:"};
-const char* TYPE_NAMES[] = {"SQUARE", "WAVE", "NOISE"};
+const char* TYPE_NAMES[] = {"1", "2", "3"};
 const char* LAYER_NAMES[] = {"MAIN", "SUB"};
 
 const char* NOTE_NAMES[] = {
@@ -112,17 +112,40 @@ static void play_sequencer_note(UINT8 channel, UINT8 note_idx) {
     }
     
     switch(channel) {
-        case 0: // Channel 1 - 50% duty cycle
+        case 0: // Channel 1 - Square wave with variable duty cycle
             NR10_REG = 0x00;  // No sweep
-            NR11_REG = CH2_DUTY_50 | 0x3F;
+            // Set duty cycle based on type
+            switch(sequencer.channels[channel].type) {
+                case 0: // Type 1 - Standard
+                    NR11_REG = CH2_DUTY_50 | 0x3F;  // 50% duty cycle
+                    break;
+                case 1: // Type 2 - Thinner
+                    NR11_REG = CH2_DUTY_25 | 0x3F;  // 25% duty cycle
+                    break;
+                case 2: // Type 3 - Inverse of Type 2
+                    NR11_REG = CH2_DUTY_12_5 | 0x3F;  // 12.5% duty cycle
+                    break;
+            }
             NR12_REG = envelope;
             NR13_REG = (UINT8)(freq & 0xFF);
             NR14_REG = 0x80 | ((freq >> 8) & 0x07);
             break;
             
-        case 1: // Channel 2 - 25% duty cycle
-            NR21_REG = CH2_DUTY_25 | 0x3F;
-            NR22_REG = envelope;
+        case 1: // Channel 2 - Square wave with variable duty cycle
+            switch(sequencer.channels[channel].type) {
+                case 0: // Type 1 - Very Thin
+                    NR21_REG = CH2_DUTY_12_5 | 0x3F;  // 12.5% duty cycle
+                    NR22_REG = envelope;
+                    break;
+                case 1: // Type 2 - Medium Pulse
+                    NR21_REG = CH2_DUTY_25 | 0x3F;   // 25% duty cycle
+                    NR22_REG = envelope;
+                    break;
+                case 2: // Type 3 - Super Wide
+                    NR21_REG = CH2_DUTY_75 | 0x3F;   // 75% duty cycle
+                    NR22_REG = envelope;
+                    break;
+            }
             NR23_REG = (UINT8)(freq & 0xFF);
             NR24_REG = 0x80 | ((freq >> 8) & 0x07);
             break;
@@ -243,10 +266,14 @@ static void draw_main_menu(void) {
         wait_vbl_done();
         fill_bkg_rect(0, PARAM_START_Y, 20, 8, 0);    // Clear parameter area
         
-        // Draw channels at parameter area
+        // Draw channels and tempo at parameter area
         for(UINT8 i = 0; i < 4; i++) {
             draw_text(2, PARAM_START_Y + i, CHANNEL_NAMES[i]);
         }
+        // Add TEMPO display below channels
+        char tempo_buffer[12];
+        sprintf(tempo_buffer, "TEMPO=%u", sequencer.tempo);
+        draw_text(2, PARAM_START_Y + 4, tempo_buffer);
         
         // Force cursor update on redraw
         last_cursor = 255;
@@ -255,13 +282,21 @@ static void draw_main_menu(void) {
         draw_sequence_display();  // Initial sequence display
     }
     
-    // Update tempo display
+    // Update tempo and step display
     if(last_tempo != sequencer.tempo) {
         wait_vbl_done();
-        fill_bkg_rect(0, 0, 8, 1, 0);  // Clear just left tempo area
+        fill_bkg_rect(0, 0, 8, 2, 0);  // Clear left area for both BPM and step
         char buffer[12];
         sprintf(buffer, "BPM=%u", sequencer.tempo);
         draw_text(0, 0, buffer);  // Keep tempo in top left
+        char num_str[3];
+    if(sequencer.current_step < 9) {
+        sprintf(num_str, "0%u", sequencer.current_step + 1);
+    } else {
+        sprintf(num_str, "%u", sequencer.current_step + 1);
+    }
+    sprintf(buffer, "STEP:%s", num_str);
+        draw_text(0, 1, buffer);  // Keep step display below BPM
         last_tempo = sequencer.tempo;
     }
     
@@ -285,9 +320,19 @@ static void draw_main_menu(void) {
 static void draw_tempo_indicator(void) {
     char buffer[12];
     wait_vbl_done();
-    fill_bkg_rect(0, 0, 8, 1, 0);  // Clear top left area
+    fill_bkg_rect(0, 0, 10, 2, 0);  // Clear more space for BPM and step
     sprintf(buffer, "BPM=%u", sequencer.tempo);
     draw_text(0, 0, buffer);
+    
+    // Add current step display below BPM
+    char num_str[3];
+    if(sequencer.current_step < 9) {
+        sprintf(num_str, "0%u", sequencer.current_step + 1);
+    } else {
+        sprintf(num_str, "%u", sequencer.current_step + 1);
+    }
+    sprintf(buffer, "STEP:%s", num_str);
+    draw_text(0, 1, buffer);
 }
 
 static void draw_sub_menu(void) {
@@ -299,6 +344,9 @@ if(sequencer.needs_redraw) {
     wait_vbl_done();
     fill_bkg_rect(0, PARAM_START_Y, 20, 8, 0);    // Clear parameter area
 fill_bkg_rect(16, 0, 4, 1, 0);      // Clear layer indicator
+    char step_buffer[12];
+    sprintf(step_buffer, "STEP:%02u", sequencer.current_step + 1);
+    draw_text(0, 1, step_buffer);  // Ensure step display is present
 
     draw_tempo_indicator();  // Add BPM display
 
@@ -411,7 +459,13 @@ static void update_parameter_display(void) {
     switch(sequencer.current_parameter) {
         case PARAM_STEP:
             current_value = sequencer.current_step;
-            sprintf(value_buffer, "STEP: %d", current_value + 1);
+            char num_str[3];
+            if(current_value < 9) {
+                sprintf(num_str, "0%u", current_value + 1);
+            } else {
+                sprintf(num_str, "%u", current_value + 1);
+            }
+            sprintf(value_buffer, "STEP:%s", num_str);
             break;
         case PARAM_NOTE:
             current_value = step->note;
@@ -551,6 +605,9 @@ static void handle_sub_menu_input(UINT8 joy) {
            case PARAM_STEP:
                sequencer.current_step = (sequencer.current_step + SEQ_MAX_STEPS + delta) % SEQ_MAX_STEPS;
                need_grid_update = (old_step != sequencer.current_step);
+               // Update step displays
+               update_parameter_display();
+               draw_tempo_indicator();  // This updates both BPM and step display
                break;
                
            case PARAM_NOTE:
@@ -581,8 +638,21 @@ static void handle_sub_menu_input(UINT8 joy) {
                break;
                
            case PARAM_TYPE:
-               if(sequencer.current_channel < 2) {
-                   safe_set_parameter(&channel->type, channel->type + delta, 0, TYPE_SQUARE);
+               // Debug display
+               {
+                   char debug[21];
+                   sprintf(debug, "TYPE:%d DELTA:%d", channel->type, delta);
+                   draw_text(0, 17, debug);
+               }
+               if(sequencer.current_channel < 2) {  // Only for Channel 1 & 2 for now
+                   INT8 new_type = (INT8)channel->type + delta;  // Allow for negative delta
+                   if(new_type >= 0 && new_type <= 2) {  // Check both bounds
+                       channel->type = (UINT8)new_type;
+                       // Debug the new value
+                       char debug[21];
+                       sprintf(debug, "NEW TYPE:%d", channel->type);
+                       draw_text(0, 16, debug);
+                   }
                }
                break;
        }
@@ -595,6 +665,7 @@ static void handle_sub_menu_input(UINT8 joy) {
    
    if(joy & J_A) {
        switch(sequencer.current_parameter) {
+           case PARAM_NOTE:
            case PARAM_STEP: {
                channel->steps[sequencer.current_step].armed ^= 1;
                UINT8 x = SEQ_START_X + sequencer.current_step;
@@ -754,7 +825,7 @@ void init_sequencer(void) {
    // Initialize first two channels as square waves
    for(UINT8 ch = 0; ch < 2; ch++) {
        sequencer.channels[ch].enabled = 1;
-       sequencer.channels[ch].type = TYPE_SQUARE;
+       sequencer.channels[ch].type = 0;  // Start at type 1
        sequencer.channels[ch].muted = 0;  // Initialize unmuted state
        
        // Initialize steps for each channel
@@ -766,6 +837,12 @@ void init_sequencer(void) {
            sequencer.channels[ch].steps[i].decay = 1;
        }
    }
+
+   // Debug initial channel types
+   char debug[21];
+   sprintf(debug, "INIT CH1 T:%d", sequencer.channels[0].type);
+   draw_text(0, 15, debug);
+
    
    // Initialize channel 3 as wave
    sequencer.channels[2].enabled = 1;
