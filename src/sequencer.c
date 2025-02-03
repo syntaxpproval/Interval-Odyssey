@@ -308,28 +308,40 @@ static void draw_main_menu(void) {
         wait_vbl_done();
         fill_bkg_rect(0, PARAM_START_Y, 20, 8, 0);    // Clear parameter area
         
-        // Draw channels, mode options, and tempo at parameter area
-        // Channels 1-4
+        // Draw channels, modes, and parameters
+        // Channels 1-4 with potential locks
         for(UINT8 i = 0; i < 4; i++) {
             draw_text(5, PARAM_START_Y + i, CHANNEL_NAMES[i]);
+            if(sequencer.chord_mode && i < 3) {
+                draw_special_tile(14, PARAM_START_Y + i, TILE_LOCK);
+            }
         }
-        // CHORDMODE and TRANSPOSE
-        draw_text(5, PARAM_START_Y + 4, "CHORDMODE");
-        draw_text(5, PARAM_START_Y + 5, "TRANSPOSE");
+
+        // CHORD mode
+        char chord_buffer[12];
+        sprintf(chord_buffer, "CHORD:%s", sequencer.chord_mode ? "ON" : "OFF");
+        draw_text(5, PARAM_START_Y + 4, chord_buffer);
+
+        // PATTERN parameter
+        draw_text(5, PARAM_START_Y + 5, "PATTERN:");
+        draw_text(13, PARAM_START_Y + 5, "1");
+
+        // TRANSPOSE with value
+        draw_text(5, PARAM_START_Y + 6, "TRANSPOSE:");
         char transpose_buffer[6];
         if(sequencer.global_transpose > 0) {
             sprintf(transpose_buffer, "+%d", sequencer.global_transpose);
         } else {
             sprintf(transpose_buffer, "%d", sequencer.global_transpose);
         }
-        draw_text(14, PARAM_START_Y + 5, transpose_buffer);
+        draw_text(14, PARAM_START_Y + 6, transpose_buffer);
+
         // TEMPO at bottom (using HALFNOTE symbol)
-        draw_special_tile(5, PARAM_START_Y + 6, HALFNOTE);
-        draw_text(6, PARAM_START_Y + 6, "=");
-        // Initial tempo value
-        char tempo_buffer[12];
+        draw_special_tile(5, PARAM_START_Y + 7, HALFNOTE);
+        draw_text(6, PARAM_START_Y + 7, "=");
+        char tempo_buffer[4];
         sprintf(tempo_buffer, "%d", sequencer.tempo);
-        draw_text(10, PARAM_START_Y + 6, tempo_buffer);
+        draw_text(7, PARAM_START_Y + 7, tempo_buffer);
         
         // Force cursor update on redraw
         last_cursor = 255;
@@ -347,10 +359,10 @@ static void draw_main_menu(void) {
         sprintf(buffer, "BPM=%u", sequencer.tempo);
         draw_text(0, 0, buffer);  // Keep tempo in top left
 
-        // Update menu parameter TEMPO display
-        fill_bkg_rect(10, PARAM_START_Y + 6, 10, 1, 0);  // Clear tempo value area only
+        // Update menu tempo display
+        fill_bkg_rect(7, PARAM_START_Y + 7, 4, 1, 0);  // Clear tempo value area only
         sprintf(buffer, "%u", sequencer.tempo);
-        draw_text(10, PARAM_START_Y + 6, buffer);
+        draw_text(7, PARAM_START_Y + 7, buffer);
 
         // Update step display
         char num_str[3];
@@ -366,15 +378,15 @@ static void draw_main_menu(void) {
     
     // Always ensure cursor is visible
     if(last_cursor != sequencer.cursor || sequencer.needs_redraw) {
-        wait_vbl_done();
-        // Clear all possible cursor positions first
-        for(UINT8 i = 0; i <= 6; i++) {
-            draw_text(3, PARAM_START_Y + i, " ");
-        }
-        // Draw new cursor
-        if(sequencer.cursor <= 6) {
-            draw_text(3, PARAM_START_Y + sequencer.cursor, ">");
-        }
+    wait_vbl_done();
+    // Clear all possible cursor positions first
+    for(UINT8 i = 0; i <= 7; i++) {
+    draw_text(3, PARAM_START_Y + i, " ");
+    }
+    // Draw new cursor
+    if(sequencer.cursor <= 7) {
+    draw_text(3, PARAM_START_Y + sequencer.cursor, ">");
+    }
         last_cursor = sequencer.cursor;
     }
     
@@ -510,6 +522,12 @@ void draw_sequencer(void) {
 }
 
 // Optimize our previous parameter display function
+static void update_pattern_display(void) {
+    wait_vbl_done();
+    fill_bkg_rect(13, PARAM_START_Y + 5, 4, 1, 0);  // Clear pattern value area
+    draw_text(13, PARAM_START_Y + 5, "1");  // For now, just display 1
+}
+
 static void update_transpose_display(void) {
     char transpose_buffer[6];
     if(sequencer.global_transpose > 0) {
@@ -518,8 +536,8 @@ static void update_transpose_display(void) {
         sprintf(transpose_buffer, "%d", sequencer.global_transpose);
     }
     wait_vbl_done();
-    fill_bkg_rect(14, PARAM_START_Y + 5, 6, 1, 0);  // Clear transpose value area
-    draw_text(14, PARAM_START_Y + 5, transpose_buffer);
+    fill_bkg_rect(14, PARAM_START_Y + 6, 4, 1, 0);  // Clear transpose value area in correct position
+    draw_text(14, PARAM_START_Y + 6, transpose_buffer);
 }
 
 // Parameter display update function
@@ -590,7 +608,7 @@ static void handle_main_menu_input(UINT8 joy) {
    if(joy & J_UP) {
        // Wrap from top to bottom
        if(sequencer.cursor == 0) {
-           sequencer.cursor = 6;  // Now points to TEMPO
+           sequencer.cursor = 7;  // Now points to TEMPO
        } else {
            sequencer.cursor--;
        }
@@ -598,7 +616,7 @@ static void handle_main_menu_input(UINT8 joy) {
    }
    if(joy & J_DOWN) {
        // Wrap from bottom to top
-       if(sequencer.cursor == 6) {
+       if(sequencer.cursor == 7) {
            sequencer.cursor = 0;
        } else {
            sequencer.cursor++;
@@ -606,20 +624,28 @@ static void handle_main_menu_input(UINT8 joy) {
        draw_main_menu();
    }
    
+   // Handle CHORD mode toggle
+   if(sequencer.cursor == 4) {  // CHORD mode position
+       if(joy & (J_LEFT | J_RIGHT)) {
+           sequencer.chord_mode ^= 1;  // Toggle between 0 and 1
+           sequencer.needs_redraw = 1;  // Force full redraw for lock icons
+       }
+   }
+
    // Handle TRANSPOSE controls
-   if(sequencer.cursor == 5) {  // TRANSPOSE position
-   if(joy & J_LEFT && sequencer.global_transpose > -12) {
-   sequencer.global_transpose--;
-   update_transpose_display();
+   if(sequencer.cursor == 6) {  // New TRANSPOSE position
+       if(joy & J_LEFT && sequencer.global_transpose > -12) {
+           sequencer.global_transpose--;
+           update_transpose_display();
+       }
+       if(joy & J_RIGHT && sequencer.global_transpose < 12) {
+           sequencer.global_transpose++;
+           update_transpose_display();
+       }
    }
-   if(joy & J_RIGHT && sequencer.global_transpose < 12) {
-   sequencer.global_transpose++;
-   update_transpose_display();
-   }
-   }
-   
+
    // Handle TEMPO controls
-   if(sequencer.cursor == 6) {  // TEMPO position
+   if(sequencer.cursor == 7) {  // New TEMPO position
        if(joy & J_LEFT && sequencer.tempo > SEQ_MIN_TEMPO) {
            sequencer.tempo--;
            calculate_frames_per_step();
@@ -632,11 +658,14 @@ static void handle_main_menu_input(UINT8 joy) {
        }
    }
    
-   if((joy & J_A) && sequencer.cursor < 4) {  // Only for channel selection
-       sequencer.current_channel = sequencer.cursor;
-       sequencer.current_parameter = PARAM_STEP;
-       sequencer.menu_layer = MENU_SUB;
-       need_menu_switch = 1;
+   if((joy & J_A) && sequencer.cursor < 4) {  // Channel selection
+       // Prevent selecting locked channels
+       if(!sequencer.chord_mode || sequencer.cursor == 3) {
+           sequencer.current_channel = sequencer.cursor;
+           sequencer.current_parameter = PARAM_STEP;
+           sequencer.menu_layer = MENU_SUB;
+           need_menu_switch = 1;
+       }
    }
    
    if(need_menu_switch) {
@@ -893,6 +922,7 @@ void init_sequencer(void) {
    memset(&sequencer, 0, sizeof(SEQUENCER_DATA));
    
    sequencer.tempo = 120;
+   sequencer.chord_mode = 0;
    sequencer.global_transpose = 0;
    sequencer.menu_layer = MENU_MAIN;
    sequencer.needs_redraw = 1;
