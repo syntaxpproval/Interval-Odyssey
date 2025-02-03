@@ -47,6 +47,19 @@ static void update_transpose_display(void);
 #define TILE_CH3 TILE_ROMAN3
 #define TILE_CH4 TILE_ROMAN4
 
+// Pop-up menu constants
+#define POPUP_START_X 1
+#define POPUP_START_Y 2
+#define POPUP_WIDTH 18
+#define POPUP_HEIGHT 8
+
+// Menu option positions
+#define OPTION_SAVE_X 5
+#define OPTION_COPY_X 10
+#define OPTION_ROW1_Y 4
+#define OPTION_ROW2_Y 5
+#define CONFIRM_ROW_Y 7
+
 // Menu text
 const char* CHANNEL_NAMES[] = {"CHANNEL1", "CHANNEL2", "CHANNEL3", "CHANNEL4"};
 const char* PARAM_LABELS[] = {"S:", "N:", "A:", "D:", "V:", "T:"};
@@ -324,7 +337,7 @@ static void draw_main_menu(void) {
 
         // PATTERN parameter
         draw_text(5, PARAM_START_Y + 5, "PATTERN:");
-        draw_text(13, PARAM_START_Y + 5, "1");
+        draw_text(13, PARAM_START_Y + 5, sequencer.bank_data.current_bank == BANK_A ? "A" : "B");
 
         // TRANSPOSE with value
         draw_text(5, PARAM_START_Y + 6, "TRANSPOSE:");
@@ -476,6 +489,30 @@ static void update_bottom_info(void) {
     draw_text(0, 17, buffer);
 }
 
+static void draw_popup_box(void) {
+    wait_vbl_done();
+    
+    // Draw border
+    for(UINT8 x = POPUP_START_X; x < POPUP_START_X + POPUP_WIDTH; x++) {
+        for(UINT8 y = POPUP_START_Y; y < POPUP_START_Y + POPUP_HEIGHT; y++) {
+            // Only draw border tiles at edges
+            if(x == POPUP_START_X || x == POPUP_START_X + POPUP_WIDTH - 1 ||
+               y == POPUP_START_Y || y == POPUP_START_Y + POPUP_HEIGHT - 1) {
+                draw_special_tile(x, y, TILE_SELECTED);
+            } else {
+                // Clear interior
+                draw_special_tile(x, y, TILE_BLANK);
+            }
+        }
+    }
+    
+    // Draw menu options
+    draw_text(OPTION_SAVE_X, OPTION_ROW1_Y, "SAVE");
+    draw_text(OPTION_COPY_X, OPTION_ROW1_Y, sequencer.bank_data.has_copy ? "PASTE" : "COPY");
+    draw_text(OPTION_SAVE_X, OPTION_ROW2_Y, "LOAD");
+    draw_text(OPTION_COPY_X, OPTION_ROW2_Y, "CLEAR");
+}
+
 void draw_sequence_display(void) {
     // Clear sequence display area
     wait_vbl_done();
@@ -525,7 +562,7 @@ void draw_sequencer(void) {
 static void update_pattern_display(void) {
     wait_vbl_done();
     fill_bkg_rect(13, PARAM_START_Y + 5, 4, 1, 0);  // Clear pattern value area
-    draw_text(13, PARAM_START_Y + 5, "1");  // For now, just display 1
+    draw_text(13, PARAM_START_Y + 5, sequencer.bank_data.current_bank == BANK_A ? "A" : "B");
 }
 
 static void update_transpose_display(void) {
@@ -600,78 +637,190 @@ static void update_parameter_display(void) {
 }
 
 
-static void handle_main_menu_input(UINT8 joy) {
-   UINT8 old_cursor = sequencer.cursor;
-   UINT8 old_tempo = sequencer.tempo;
-   UINT8 need_menu_switch = 0;
-   
-   if(joy & J_UP) {
-       // Wrap from top to bottom
-       if(sequencer.cursor == 0) {
-           sequencer.cursor = 7;  // Now points to TEMPO
-       } else {
-           sequencer.cursor--;
-       }
-       draw_main_menu();
-   }
-   if(joy & J_DOWN) {
-       // Wrap from bottom to top
-       if(sequencer.cursor == 7) {
-           sequencer.cursor = 0;
-       } else {
-           sequencer.cursor++;
-       }
-       draw_main_menu();
-   }
-   
-   // Handle CHORD mode toggle
-   if(sequencer.cursor == 4) {  // CHORD mode position
-       if(joy & (J_LEFT | J_RIGHT)) {
-           sequencer.chord_mode ^= 1;  // Toggle between 0 and 1
-           sequencer.needs_redraw = 1;  // Force full redraw for lock icons
-       }
-   }
-
-   // Handle TRANSPOSE controls
-   if(sequencer.cursor == 6) {  // New TRANSPOSE position
-       if(joy & J_LEFT && sequencer.global_transpose > -12) {
-           sequencer.global_transpose--;
-           update_transpose_display();
-       }
-       if(joy & J_RIGHT && sequencer.global_transpose < 12) {
-           sequencer.global_transpose++;
-           update_transpose_display();
-       }
-   }
-
-   // Handle TEMPO controls
-   if(sequencer.cursor == 7) {  // New TEMPO position
-       if(joy & J_LEFT && sequencer.tempo > SEQ_MIN_TEMPO) {
-           sequencer.tempo--;
-           calculate_frames_per_step();
-           draw_main_menu();
-       }
-       if(joy & J_RIGHT && sequencer.tempo < SEQ_MAX_TEMPO) {
-           sequencer.tempo++;
-           calculate_frames_per_step();
-           draw_main_menu();
-       }
-   }
-   
-   if((joy & J_A) && sequencer.cursor < 4) {  // Channel selection
-       // Prevent selecting locked channels
-       if(!sequencer.chord_mode || sequencer.cursor == 3) {
-           sequencer.current_channel = sequencer.cursor;
-           sequencer.current_parameter = PARAM_STEP;
-           sequencer.menu_layer = MENU_SUB;
-           need_menu_switch = 1;
-       }
-   }
-   
-   if(need_menu_switch) {
-       sequencer.needs_redraw = 1;
-   }
+static void handle_popup_input(UINT8 joy) {
+    
+    // Clear previous cursor
+    if(sequencer.bank_data.prompt_state != PROMPT_CONFIRM) {
+        draw_text(sequencer.bank_data.cursor_x ? OPTION_COPY_X - 1 : OPTION_SAVE_X - 1,
+                  sequencer.bank_data.cursor_y ? OPTION_ROW2_Y : OPTION_ROW1_Y, " ");
+    }
+    
+    // Handle navigation
+    if(joy & J_UP && sequencer.bank_data.cursor_y > 0) {
+        sequencer.bank_data.cursor_y--;
+    }
+    if(joy & J_DOWN && sequencer.bank_data.cursor_y < 1) {
+        sequencer.bank_data.cursor_y++;
+    }
+    if(joy & J_LEFT && sequencer.bank_data.cursor_x > 0) {
+        sequencer.bank_data.cursor_x--;
+    }
+    if(joy & J_RIGHT && sequencer.bank_data.cursor_x < 1) {
+        sequencer.bank_data.cursor_x++;
+    }
+    
+    // Draw new cursor position
+    if(sequencer.bank_data.prompt_state != PROMPT_CONFIRM) {
+        draw_text(sequencer.bank_data.cursor_x ? OPTION_COPY_X - 1 : OPTION_SAVE_X - 1,
+                  sequencer.bank_data.cursor_y ? OPTION_ROW2_Y : OPTION_ROW1_Y, ">");
+    }
+    
+    // Handle selection
+    if(joy & J_A) {
+        // Determine selected option
+        if(sequencer.bank_data.cursor_y == 0) {  // Top row
+            if(sequencer.bank_data.cursor_x == 0) {  // SAVE
+                sequencer.bank_data.prompt_state = PROMPT_CONFIRM;
+                draw_text(7, CONFIRM_ROW_Y, "YES NO");
+                draw_text(6, CONFIRM_ROW_Y, ">");
+            } else {  // COPY/PASTE
+                if(sequencer.bank_data.has_copy) {
+                    sequencer.bank_data.prompt_state = PROMPT_PASTE;
+                } else {
+                    sequencer.bank_data.prompt_state = PROMPT_COPY;
+                }
+                draw_text(7, CONFIRM_ROW_Y, "YES NO");
+                draw_text(6, CONFIRM_ROW_Y, ">");
+            }
+        } else {  // Bottom row
+            if(sequencer.bank_data.cursor_x == 0) {  // LOAD
+                sequencer.bank_data.prompt_state = PROMPT_LOAD;
+                draw_text(7, CONFIRM_ROW_Y, "YES NO");
+                draw_text(6, CONFIRM_ROW_Y, ">");
+            } else {  // CLEAR
+                sequencer.bank_data.prompt_state = PROMPT_CLEAR;
+                draw_text(7, CONFIRM_ROW_Y, "YES NO");
+                draw_text(6, CONFIRM_ROW_Y, ">");
+            }
+        }
+    }
+    
+    // Handle confirmation
+    if(sequencer.bank_data.prompt_state == PROMPT_CONFIRM) {
+        // Clear previous cursor
+        draw_text(sequencer.bank_data.confirm_cursor ? 10 : 6, CONFIRM_ROW_Y, " ");
+        
+        if(joy & J_LEFT && sequencer.bank_data.confirm_cursor > 0) {
+            sequencer.bank_data.confirm_cursor--;
+        }
+        if(joy & J_RIGHT && sequencer.bank_data.confirm_cursor < 1) {
+            sequencer.bank_data.confirm_cursor++;
+        }
+        
+        // Draw new cursor
+        draw_text(sequencer.bank_data.confirm_cursor ? 10 : 6, CONFIRM_ROW_Y, ">");
+        
+        if(joy & J_B) {
+            // Return to main popup menu
+            sequencer.bank_data.prompt_state = PROMPT_SAVE;
+            fill_bkg_rect(6, CONFIRM_ROW_Y, 6, 1, TILE_BLANK);
+        }
+    } else if(joy & J_B) {
+        // Exit popup menu
+        sequencer.bank_data.prompt_state = PROMPT_NONE;
+        sequencer.needs_redraw = 1;
+    }
 }
+
+static void handle_popup_input(UINT8 joy);
+static void handle_main_menu_input(UINT8 joy) {
+    UINT8 old_cursor = sequencer.cursor;
+    UINT8 old_tempo = sequencer.tempo;
+    UINT8 need_menu_switch = 0;
+    
+    if(joy & J_UP) {
+        // Wrap from top to bottom
+        if(sequencer.cursor == 0) {
+            sequencer.cursor = 7;  // Now points to TEMPO
+        } else {
+            sequencer.cursor--;
+        }
+        draw_main_menu();
+    }
+    if(joy & J_DOWN) {
+        // Wrap from bottom to top
+        if(sequencer.cursor == 7) {
+            sequencer.cursor = 0;
+        } else {
+            sequencer.cursor++;
+        }
+        draw_main_menu();
+    }
+    
+    // Handle PATTERN bank switching
+    if(sequencer.cursor == 5) {  // PATTERN position
+        if(joy & J_RIGHT && sequencer.bank_data.current_bank == BANK_A) {
+            if(!sequencer.is_playing || sequencer.playback_step == 15) {
+                sequencer.bank_data.current_bank = BANK_B;
+                update_pattern_display();
+            } else {
+                sequencer.bank_data.is_switching = 1;
+                sequencer.bank_data.switch_pending = 1;
+            }
+        } else if(joy & J_LEFT && sequencer.bank_data.current_bank == BANK_B) {
+            if(!sequencer.is_playing || sequencer.playback_step == 15) {
+                sequencer.bank_data.current_bank = BANK_A;
+                update_pattern_display();
+            } else {
+                sequencer.bank_data.is_switching = 1;
+                sequencer.bank_data.switch_pending = 1;
+            }
+        }
+    }
+
+    // Handle CHORD mode toggle
+    if(sequencer.cursor == 4) {  // CHORD mode position
+        if(joy & (J_LEFT | J_RIGHT)) {
+            sequencer.chord_mode ^= 1;  // Toggle between 0 and 1
+            sequencer.needs_redraw = 1;  // Force full redraw for lock icons
+        }
+    }
+
+    // Handle TRANSPOSE controls
+    if(sequencer.cursor == 6) {  // New TRANSPOSE position
+        if(joy & J_LEFT && sequencer.global_transpose > -12) {
+            sequencer.global_transpose--;
+            update_transpose_display();
+        }
+        if(joy & J_RIGHT && sequencer.global_transpose < 12) {
+            sequencer.global_transpose++;
+            update_transpose_display();
+        }
+    }
+
+    // Handle TEMPO controls
+    if(sequencer.cursor == 7) {  // New TEMPO position
+        if(joy & J_LEFT && sequencer.tempo > SEQ_MIN_TEMPO) {
+            sequencer.tempo--;
+            calculate_frames_per_step();
+            draw_main_menu();
+        }
+        if(joy & J_RIGHT && sequencer.tempo < SEQ_MAX_TEMPO) {
+            sequencer.tempo++;
+            calculate_frames_per_step();
+            draw_main_menu();
+        }
+    }
+    
+    if((joy & J_A) && sequencer.cursor < 4) {  // Channel selection
+        // Prevent selecting locked channels
+        if(!sequencer.chord_mode || sequencer.cursor == 3) {
+            sequencer.current_channel = sequencer.cursor;
+            sequencer.current_parameter = PARAM_STEP;
+            sequencer.menu_layer = MENU_SUB;
+            need_menu_switch = 1;
+        }
+    } else if((joy & J_A) && sequencer.cursor == 5) {  // PATTERN menu
+        sequencer.bank_data.prompt_state = PROMPT_SAVE;  // Start with SAVE selected
+        draw_popup_box();
+    }
+    
+    if(need_menu_switch) {
+        sequencer.needs_redraw = 1;
+    }
+}
+
+
 
 static void handle_sub_menu_input(UINT8 joy) {
    CHANNEL_DATA* channel = &sequencer.channels[sequencer.current_channel];
@@ -808,7 +957,9 @@ void handle_sequencer_input(UINT8 joy) {
     static UINT8 last_joy = 0;
   
     if(joy != last_joy) {
-        if(joy & J_SELECT) {
+        if(sequencer.bank_data.prompt_state != PROMPT_NONE) {
+            handle_popup_input(joy);
+        } else if(joy & J_SELECT) {
             play_sequencer_note(sequencer.current_channel, 
                 sequencer.channels[sequencer.current_channel].steps[sequencer.current_step].note);
         } else if(joy & J_START) {
@@ -865,6 +1016,18 @@ static void update_step_visuals(void) {
 
 void update_sequencer(void) {
     static UINT8 last_playback_step = 0;
+    
+    // Handle pending bank switch
+    if(sequencer.bank_data.is_switching && sequencer.bank_data.switch_pending) {
+        if(sequencer.playback_step == 15) {
+            // Switch banks at end of pattern
+            sequencer.bank_data.current_bank = 
+                (sequencer.bank_data.current_bank == BANK_A) ? BANK_B : BANK_A;
+            update_pattern_display();
+            sequencer.bank_data.is_switching = 0;
+            sequencer.bank_data.switch_pending = 0;
+        }
+    }
     
     if(sequencer.is_playing) {
         sequencer.frame_counter++;
@@ -924,6 +1087,16 @@ void init_sequencer(void) {
    sequencer.tempo = 120;
    sequencer.chord_mode = 0;
    sequencer.global_transpose = 0;
+   
+   // Initialize bank system
+   sequencer.bank_data.current_bank = BANK_A;
+   sequencer.bank_data.is_switching = 0;
+   sequencer.bank_data.switch_pending = 0;
+   sequencer.bank_data.has_copy = 0;
+   sequencer.bank_data.cursor_x = 0;
+   sequencer.bank_data.cursor_y = 0;
+   sequencer.bank_data.confirm_cursor = 0;
+   sequencer.bank_data.prompt_state = PROMPT_NONE;
    sequencer.menu_layer = MENU_MAIN;
    sequencer.needs_redraw = 1;
    sequencer.last_parameter = 0;    // Initialize tracking
