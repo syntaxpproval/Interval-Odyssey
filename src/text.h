@@ -11,7 +11,15 @@ extern const unsigned char char_to_tile[];
 #define TILE_ROMAN2      117u  // Roman numeral II
 #define TILE_ROMAN3      118u  // Roman numeral III
 #define TILE_ROMAN4      119u  // Roman numeral IV
+#define TILE_UP_ARROW    98u    // Up-facing arrow
+#define TILE_DOWN_ARROW  99u  // Down-facing arrow
+#define TILE_LEFT_ARROW  100u  // Left-facing arrow
 #define TILE_RIGHT_ARROW 101u  // Right-facing arrow
+#define TILE_ABUTTON	 102u  // A Button
+#define TILE_BBUTTON     103u  // B Button
+#define TILE_LOCK		 110u  // Locked 
+#define TILE_UNLOCK      111u  // Unlocked
+#define HALFNOTE		 115u // Half-note
 // Using TILE_STAR from tileset.h
 
 // Multi-column special text

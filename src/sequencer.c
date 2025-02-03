@@ -21,6 +21,8 @@ static void draw_sub_menu(void);
 static void update_step_visuals(void);
 static void handle_main_menu_input(UINT8 joy);
 static void handle_sub_menu_input(UINT8 joy);
+static void update_transpose_display(void);
+
 
 
 // Display constants
@@ -49,7 +51,7 @@ static void handle_sub_menu_input(UINT8 joy);
 const char* CHANNEL_NAMES[] = {"CHANNEL1", "CHANNEL2", "CHANNEL3", "CHANNEL4"};
 const char* PARAM_LABELS[] = {"S:", "N:", "A:", "D:", "V:", "T:"};
 const char* TYPE_NAMES[] = {"1", "2", "3"};
-const char* LAYER_NAMES[] = {"MAIN", "SUB"};
+const char* LAYER_NAMES[] = {"MAIN MENU", "SUB"};
 
 const char* NOTE_NAMES[] = {
     "C3", "Db3", "D3", "Eb3", "E3", "F3", "Gb3", "G3", "Ab3", "A3", "Bb3", "B3",
@@ -81,20 +83,22 @@ static void play_sequencer_note(UINT8 channel, UINT8 note_idx) {
     // Skip if channel is muted
     if(sequencer.channels[channel].muted) return;
     
-    if(note_idx > SEQ_MAX_NOTE) return;
+    // Apply global transpose to note_idx, ensuring we stay within valid note range
+    INT16 transposed_note = (INT16)note_idx + sequencer.global_transpose;
+    if(transposed_note < SEQ_MIN_NOTE) transposed_note = SEQ_MIN_NOTE;
+    if(transposed_note > SEQ_MAX_NOTE) transposed_note = SEQ_MAX_NOTE;
     
-    UINT16 freq = get_note_frequency(note_idx);
+    UINT16 freq = get_note_frequency(transposed_note);
     
     // Get current step's envelope parameters
     SEQUENCER_STEP* step = &sequencer.channels[channel].steps[sequencer.playback_step];
     
     // Configure envelope based on attack/decay
-    UINT8 envelope;
+    UINT8 envelope = 0;
     if(step->attack > 0) {
-        // Attack mode: Start quiet and increase
-        envelope = (0x00 << 4) |     // Initial volume = 0
-                  (0x08) |           // Direction = up
-                  ((step->attack & 0x07) + 1); // Step length 1-7
+        envelope = (0x00 << 4) |       // Initial volume = 0
+                  0x08 |              // Direction = up
+                  (step->attack & 0x07) + 1;  // Step length 1-7
         
         // Set duration for envelope tracking
         sequencer.envelope_duration[channel] = (step->attack * 8) + (step->decay * 8);
@@ -133,17 +137,17 @@ static void play_sequencer_note(UINT8 channel, UINT8 note_idx) {
             
         case 1: // Channel 2 - Square wave with variable duty cycle
             switch(sequencer.channels[channel].type) {
-                case 0: // Type 1 - Very Thin
+                case 0: // Type 1 - Sharp pulse
                     NR21_REG = CH2_DUTY_12_5 | 0x3F;  // 12.5% duty cycle
-                    NR22_REG = envelope;
+                    NR22_REG = (envelope & 0xF8) | 0x04;  // Faster decay
                     break;
-                case 1: // Type 2 - Medium Pulse
+                case 1: // Type 2 - Rich pulse
                     NR21_REG = CH2_DUTY_25 | 0x3F;   // 25% duty cycle
-                    NR22_REG = envelope;
+                    NR22_REG = (envelope & 0xF8) | 0x02;  // Medium decay
                     break;
-                case 2: // Type 3 - Super Wide
-                    NR21_REG = CH2_DUTY_75 | 0x3F;   // 75% duty cycle
-                    NR22_REG = envelope;
+                case 2: // Type 3 - Square buzz
+                    NR21_REG = CH2_DUTY_50 | 0x3F;   // 50% duty cycle
+                    NR22_REG = (envelope & 0xF8) | 0x01;  // Slow decay
                     break;
             }
             NR23_REG = (UINT8)(freq & 0xFF);
@@ -151,46 +155,84 @@ static void play_sequencer_note(UINT8 channel, UINT8 note_idx) {
             break;
             
         case 2: // Channel 3 - Wave
-        NR30_REG = 0x80;  // Enable wave channel
-        
-        // Handle decay values
-        UINT8 length_value;
-        if(step->decay == 0) {
-        length_value = 0;  // Maximum length
-        } else {
-        // Set explicit lengths for each decay value (256-value)/256 seconds
-        // Higher decay = longer time
-        switch(step->decay) {
-        case 1: length_value = 128;   // ~0.75s - shortest
-        break;
-        case 2: length_value = 48;   // ~0.81s
-        break;
-        case 3: length_value = 32;   // ~0.875s
-        break;
-        case 4: length_value = 24;   // ~0.91s
-        break;
-        case 5: length_value = 16;   // ~0.94s
-        break;
-        case 6: length_value = 8;    // ~0.97s - longest
-        break;
-        default: length_value = 128;  // Fallback to shortest
-        }
-        }
-        NR31_REG = length_value;
-        
-        // Set initial volume based on attack
-        UINT8 vol_code;
-        if(step->attack > 0) {
-            vol_code = 0x60;  // 25% volume to start
-        } else {
-            vol_code = 0x20;  // 100% volume
-        }
-        NR32_REG = vol_code;
-        
-        NR33_REG = (UINT8)(freq & 0xFF);
-        // Enable length counter (bit 6) and trigger note (bit 7)
-        NR34_REG = 0xC0 | ((freq >> 8) & 0x07);
-        break;
+            NR30_REG = 0x00;  // Disable channel 3 before writing to wave RAM
+            
+            // Set wave pattern based on type
+            switch(sequencer.channels[channel].type) {
+                case 0: // Type 1 - Triangle wave
+                    {
+                        const UINT8 triangle_wave[] = {
+                            0x01, 0x23, 0x45, 0x67,
+                            0x89, 0xAB, 0xCD, 0xEF,
+                            0xFE, 0xDC, 0xBA, 0x98,
+                            0x76, 0x54, 0x32, 0x10
+                        };
+                        for(UINT8 i = 0; i < 16; i++) {
+                            *((UINT8*)(0xFF30 + i)) = triangle_wave[i];
+                        }
+                    }
+                    break;
+                    
+                case 1: // Type 2 - Sawtooth wave
+                    {
+                        const UINT8 sawtooth_wave[] = {
+                            0x01, 0x12, 0x23, 0x34,
+                            0x45, 0x56, 0x67, 0x78,
+                            0x89, 0x9A, 0xAB, 0xBC,
+                            0xCD, 0xDE, 0xEF, 0xFF
+                        };
+                        for(UINT8 i = 0; i < 16; i++) {
+                            *((UINT8*)(0xFF30 + i)) = sawtooth_wave[i];
+                        }
+                    }
+                    break;
+                    
+                case 2: // Type 3 - Sine wave
+                    {
+                        const UINT8 sine_wave[] = {
+                            0x89, 0xAB, 0xCD, 0xEF,
+                            0xFE, 0xFE, 0xFE, 0xEF,
+                            0xCD, 0xAB, 0x89, 0x67,
+                            0x45, 0x23, 0x01, 0x01
+                        };
+                        for(UINT8 i = 0; i < 16; i++) {
+                            *((UINT8*)(0xFF30 + i)) = sine_wave[i];
+                        }
+                    }
+                    break;
+            }
+            
+            NR30_REG = 0x80;  // Enable wave channel
+            
+            // Handle decay values
+            UINT8 length_value;
+            if(step->decay == 0) {
+                length_value = 0;  // Maximum length
+            } else {
+                switch(step->decay) {
+                    case 1: length_value = 128; break;  // ~0.75s - shortest
+                    case 2: length_value = 48;  break;  // ~0.81s
+                    case 3: length_value = 32;  break;  // ~0.875s
+                    case 4: length_value = 24;  break;  // ~0.91s
+                    case 5: length_value = 16;  break;  // ~0.94s
+                    case 6: length_value = 8;   break;  // ~0.97s - longest
+                    default: length_value = 128; break;  // Fallback to shortest
+                }
+            }
+            NR31_REG = length_value;
+            
+            // Set initial volume based on attack
+            UINT8 vol_code;
+            if(step->attack > 0) {
+                vol_code = 0x60;  // 25% volume to start
+            } else {
+                vol_code = 0x20;  // 100% volume
+            }
+            NR32_REG = vol_code;
+            
+            NR33_REG = (UINT8)(freq & 0xFF);
+            NR34_REG = 0xC0 | ((freq >> 8) & 0x07);
+            break;
             
         case 3: // Channel 4 - Noise
             // Configure envelope like channels 1 & 2
@@ -253,7 +295,7 @@ static void draw_layer_indicator(void) {
     if(sequencer.menu_layer == MENU_MAIN) {
         wait_vbl_done();
         fill_bkg_rect(16, 0, 4, 1, 0);  // Clear previous text
-        draw_text(16, 0, LAYER_NAMES[sequencer.menu_layer]);
+        draw_text(10, 0, LAYER_NAMES[sequencer.menu_layer]);
     }
 }
 static void draw_main_menu(void) {
@@ -266,14 +308,28 @@ static void draw_main_menu(void) {
         wait_vbl_done();
         fill_bkg_rect(0, PARAM_START_Y, 20, 8, 0);    // Clear parameter area
         
-        // Draw channels and tempo at parameter area
+        // Draw channels, mode options, and tempo at parameter area
+        // Channels 1-4
         for(UINT8 i = 0; i < 4; i++) {
-            draw_text(2, PARAM_START_Y + i, CHANNEL_NAMES[i]);
+            draw_text(5, PARAM_START_Y + i, CHANNEL_NAMES[i]);
         }
-        // Add TEMPO display below channels
+        // CHORDMODE and TRANSPOSE
+        draw_text(5, PARAM_START_Y + 4, "CHORDMODE");
+        draw_text(5, PARAM_START_Y + 5, "TRANSPOSE");
+        char transpose_buffer[6];
+        if(sequencer.global_transpose > 0) {
+            sprintf(transpose_buffer, "+%d", sequencer.global_transpose);
+        } else {
+            sprintf(transpose_buffer, "%d", sequencer.global_transpose);
+        }
+        draw_text(14, PARAM_START_Y + 5, transpose_buffer);
+        // TEMPO at bottom (using HALFNOTE symbol)
+        draw_special_tile(5, PARAM_START_Y + 6, HALFNOTE);
+        draw_text(6, PARAM_START_Y + 6, "=");
+        // Initial tempo value
         char tempo_buffer[12];
-        sprintf(tempo_buffer, "TEMPO=%u", sequencer.tempo);
-        draw_text(2, PARAM_START_Y + 4, tempo_buffer);
+        sprintf(tempo_buffer, "%d", sequencer.tempo);
+        draw_text(10, PARAM_START_Y + 6, tempo_buffer);
         
         // Force cursor update on redraw
         last_cursor = 255;
@@ -285,17 +341,25 @@ static void draw_main_menu(void) {
     // Update tempo and step display
     if(last_tempo != sequencer.tempo) {
         wait_vbl_done();
+        // Update top BPM display
         fill_bkg_rect(0, 0, 8, 2, 0);  // Clear left area for both BPM and step
         char buffer[12];
         sprintf(buffer, "BPM=%u", sequencer.tempo);
         draw_text(0, 0, buffer);  // Keep tempo in top left
+
+        // Update menu parameter TEMPO display
+        fill_bkg_rect(10, PARAM_START_Y + 6, 10, 1, 0);  // Clear tempo value area only
+        sprintf(buffer, "%u", sequencer.tempo);
+        draw_text(10, PARAM_START_Y + 6, buffer);
+
+        // Update step display
         char num_str[3];
-    if(sequencer.current_step < 9) {
-        sprintf(num_str, "0%u", sequencer.current_step + 1);
-    } else {
-        sprintf(num_str, "%u", sequencer.current_step + 1);
-    }
-    sprintf(buffer, "STEP:%s", num_str);
+        if(sequencer.current_step < 9) {
+            sprintf(num_str, "0%u", sequencer.current_step + 1);
+        } else {
+            sprintf(num_str, "%u", sequencer.current_step + 1);
+        }
+        sprintf(buffer, "STEP:%s", num_str);
         draw_text(0, 1, buffer);  // Keep step display below BPM
         last_tempo = sequencer.tempo;
     }
@@ -304,12 +368,12 @@ static void draw_main_menu(void) {
     if(last_cursor != sequencer.cursor || sequencer.needs_redraw) {
         wait_vbl_done();
         // Clear all possible cursor positions first
-        for(UINT8 i = 0; i <= 4; i++) {
-            draw_text(0, PARAM_START_Y + i, " ");
+        for(UINT8 i = 0; i <= 6; i++) {
+            draw_text(3, PARAM_START_Y + i, " ");
         }
         // Draw new cursor
-        if(sequencer.cursor <= 4) {
-            draw_text(0, PARAM_START_Y + sequencer.cursor, ">");
+        if(sequencer.cursor <= 6) {
+            draw_text(3, PARAM_START_Y + sequencer.cursor, ">");
         }
         last_cursor = sequencer.cursor;
     }
@@ -351,14 +415,14 @@ fill_bkg_rect(16, 0, 4, 1, 0);      // Clear layer indicator
     draw_tempo_indicator();  // Add BPM display
 
     // Draw static parameter labels
-    draw_text(2, PARAM_START_Y, "STEP    ");
-    draw_text(2, PARAM_START_Y + 1, "NOTE    ");
-    draw_text(2, PARAM_START_Y + 2, "ATTACK  ");
-    draw_text(2, PARAM_START_Y + 3, "DECAY   ");
-    draw_text(2, PARAM_START_Y + 4, "VOLUME  ");
-    draw_text(2, PARAM_START_Y + 5, "TYPE    ");
-    draw_text(2, PARAM_START_Y + 6, "MUTE CH ");
-    draw_text(2, PARAM_START_Y + 7, "EXIT    ");
+    draw_text(4, PARAM_START_Y, "STEP    ");
+    draw_text(4, PARAM_START_Y + 1, "NOTE    ");
+    draw_text(4, PARAM_START_Y + 2, "ATTACK  ");
+    draw_text(4, PARAM_START_Y + 3, "DECAY   ");
+    draw_text(4, PARAM_START_Y + 4, "VOLUME  ");
+    draw_text(4, PARAM_START_Y + 5, "TYPE    ");
+    draw_text(4, PARAM_START_Y + 6, "MUTE CH ");
+    draw_text(4, PARAM_START_Y + 7, "EXIT    ");
 
     draw_sequence_display();
     last_param = 255;  // Force parameter update
@@ -366,17 +430,15 @@ fill_bkg_rect(16, 0, 4, 1, 0);      // Clear layer indicator
 
 // Update parameter cursor only if changed
 if(last_param != sequencer.current_parameter) {
-    wait_vbl_done();
-    // Clear old cursor position
-for(UINT8 i = 0; i < PARAM_COUNT; i++) {
-    draw_text(0, PARAM_START_Y + i, " ");
-}
-// Draw new cursor
-draw_text(0, PARAM_START_Y + sequencer.current_parameter, ">");
+wait_vbl_done();
+// Clear ALL possible cursor positions
+fill_bkg_rect(0, PARAM_START_Y, 3, PARAM_COUNT, 0);  // Clear full width for cursor area
+// Draw new cursor in correct position
+draw_text(2, PARAM_START_Y + sequencer.current_parameter, ">");
 last_param = sequencer.current_parameter;
 
 update_parameter_display();
-update_bottom_info();
+    update_bottom_info();
 }
 }
 
@@ -388,7 +450,7 @@ static void update_bottom_info(void) {
     wait_vbl_done();
     fill_bkg_rect(0, 17, 20, 1, 0);  // Clear bottom line
     
-    sprintf(buffer, "CH%d  ", sequencer.current_channel + 1);
+    sprintf(buffer, "CH%d        ", sequencer.current_channel + 1);
     switch(sequencer.current_parameter) {
         case PARAM_STEP:
             strcat(buffer, channel->steps[sequencer.current_step].armed ? 
@@ -448,6 +510,19 @@ void draw_sequencer(void) {
 }
 
 // Optimize our previous parameter display function
+static void update_transpose_display(void) {
+    char transpose_buffer[6];
+    if(sequencer.global_transpose > 0) {
+        sprintf(transpose_buffer, "+%d", sequencer.global_transpose);
+    } else {
+        sprintf(transpose_buffer, "%d", sequencer.global_transpose);
+    }
+    wait_vbl_done();
+    fill_bkg_rect(14, PARAM_START_Y + 5, 6, 1, 0);  // Clear transpose value area
+    draw_text(14, PARAM_START_Y + 5, transpose_buffer);
+}
+
+// Parameter display update function
 static void update_parameter_display(void) {
     static UINT8 last_value = 255;  // Track last value to prevent redundant updates
     CHANNEL_DATA* channel = &sequencer.channels[sequencer.current_channel];
@@ -465,31 +540,31 @@ static void update_parameter_display(void) {
             } else {
                 sprintf(num_str, "%u", current_value + 1);
             }
-            sprintf(value_buffer, "STEP:%s", num_str);
+            sprintf(value_buffer, "   Step:%s", num_str);
             break;
         case PARAM_NOTE:
             current_value = step->note;
-            sprintf(value_buffer, "NOTE: %s", NOTE_NAMES[current_value]);
+            sprintf(value_buffer, "  Note:%s", NOTE_NAMES[current_value]);
             break;
         case PARAM_ATTACK:
             current_value = step->attack;
-            sprintf(value_buffer, "ATTACK: %d", current_value);
+            sprintf(value_buffer, "  Attack:%d", current_value);
             break;
         case PARAM_DECAY:
             current_value = step->decay;
-            sprintf(value_buffer, "DECAY: %d", current_value);
+            sprintf(value_buffer, "   Decay:%d", current_value);
             break;
         case PARAM_VOLUME:
             current_value = step->volume;
-            sprintf(value_buffer, "VOLUME: %d", current_value);
+            sprintf(value_buffer, " Volume:%d", current_value);
             break;
         case PARAM_TYPE:
             current_value = channel->type;
-            sprintf(value_buffer, "TYPE: %s", TYPE_NAMES[current_value]);
+            sprintf(value_buffer, " WavType:%s", TYPE_NAMES[current_value]);
             break;
         case PARAM_MUTE:
             current_value = channel->muted;
-            sprintf(value_buffer, "MUTE: %s", current_value ? "ON" : "OFF");
+            sprintf(value_buffer, "Mute C:%s", current_value ? "ON" : "OFF");
             break;
         case PARAM_EXIT:
             current_value = 0;
@@ -515,7 +590,7 @@ static void handle_main_menu_input(UINT8 joy) {
    if(joy & J_UP) {
        // Wrap from top to bottom
        if(sequencer.cursor == 0) {
-           sequencer.cursor = 4;
+           sequencer.cursor = 6;  // Now points to TEMPO
        } else {
            sequencer.cursor--;
        }
@@ -523,7 +598,7 @@ static void handle_main_menu_input(UINT8 joy) {
    }
    if(joy & J_DOWN) {
        // Wrap from bottom to top
-       if(sequencer.cursor == 4) {
+       if(sequencer.cursor == 6) {
            sequencer.cursor = 0;
        } else {
            sequencer.cursor++;
@@ -531,7 +606,20 @@ static void handle_main_menu_input(UINT8 joy) {
        draw_main_menu();
    }
    
-   if(sequencer.cursor == 4) {
+   // Handle TRANSPOSE controls
+   if(sequencer.cursor == 5) {  // TRANSPOSE position
+   if(joy & J_LEFT && sequencer.global_transpose > -12) {
+   sequencer.global_transpose--;
+   update_transpose_display();
+   }
+   if(joy & J_RIGHT && sequencer.global_transpose < 12) {
+   sequencer.global_transpose++;
+   update_transpose_display();
+   }
+   }
+   
+   // Handle TEMPO controls
+   if(sequencer.cursor == 6) {  // TEMPO position
        if(joy & J_LEFT && sequencer.tempo > SEQ_MIN_TEMPO) {
            sequencer.tempo--;
            calculate_frames_per_step();
@@ -544,7 +632,7 @@ static void handle_main_menu_input(UINT8 joy) {
        }
    }
    
-   if((joy & J_A) && sequencer.cursor < 4) {
+   if((joy & J_A) && sequencer.cursor < 4) {  // Only for channel selection
        sequencer.current_channel = sequencer.cursor;
        sequencer.current_parameter = PARAM_STEP;
        sequencer.menu_layer = MENU_SUB;
@@ -574,8 +662,8 @@ static void handle_sub_menu_input(UINT8 joy) {
        
        // Update cursor and value
        wait_vbl_done();
-       draw_text(0, PARAM_START_Y + sequencer.last_parameter, " ");
-       draw_text(0, PARAM_START_Y + sequencer.current_parameter, ">");
+       fill_bkg_rect(0, PARAM_START_Y, 3, PARAM_COUNT, 0);  // Clear entire cursor area
+       draw_text(2, PARAM_START_Y + sequencer.current_parameter, ">");
        
        update_parameter_display();
        update_bottom_info();
@@ -591,8 +679,8 @@ static void handle_sub_menu_input(UINT8 joy) {
        }
        
        wait_vbl_done();
-       draw_text(0, PARAM_START_Y + sequencer.last_parameter, " ");
-       draw_text(0, PARAM_START_Y + sequencer.current_parameter, ">");
+       fill_bkg_rect(0, PARAM_START_Y, 3, PARAM_COUNT, 0);  // Clear entire cursor area
+       draw_text(2, PARAM_START_Y + sequencer.current_parameter, ">");
        
        update_parameter_display();
        update_bottom_info();
@@ -638,20 +726,10 @@ static void handle_sub_menu_input(UINT8 joy) {
                break;
                
            case PARAM_TYPE:
-               // Debug display
-               {
-                   char debug[21];
-                   sprintf(debug, "TYPE:%d DELTA:%d", channel->type, delta);
-                   draw_text(0, 17, debug);
-               }
-               if(sequencer.current_channel < 2) {  // Only for Channel 1 & 2 for now
-                   INT8 new_type = (INT8)channel->type + delta;  // Allow for negative delta
-                   if(new_type >= 0 && new_type <= 2) {  // Check both bounds
+               if(sequencer.current_channel <= 2) {  // Allow for Channels 1, 2, and 3
+                   INT8 new_type = (INT8)channel->type + delta;
+                   if(new_type >= 0 && new_type <= 2) {  // Three types (0-2)
                        channel->type = (UINT8)new_type;
-                       // Debug the new value
-                       char debug[21];
-                       sprintf(debug, "NEW TYPE:%d", channel->type);
-                       draw_text(0, 16, debug);
                    }
                }
                break;
@@ -815,6 +893,7 @@ void init_sequencer(void) {
    memset(&sequencer, 0, sizeof(SEQUENCER_DATA));
    
    sequencer.tempo = 120;
+   sequencer.global_transpose = 0;
    sequencer.menu_layer = MENU_MAIN;
    sequencer.needs_redraw = 1;
    sequencer.last_parameter = 0;    // Initialize tracking

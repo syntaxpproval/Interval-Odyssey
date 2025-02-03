@@ -67,6 +67,7 @@ typedef struct {
     UINT8 frame_counter;
     UINT8 frames_per_step;
     UINT8 envelope_duration[SEQ_NUM_CHANNELS];    // Track envelope duration for each channel
+    INT8 global_transpose;    // Global transpose value (-12 to +12 semitones)
 	UINT8 last_parameter;    // New: Track last parameter
     UINT8 last_cursor_pos;   // New: Track last cursor
     CHANNEL_DATA channels[SEQ_NUM_CHANNELS];
