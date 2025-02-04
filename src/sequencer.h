@@ -13,6 +13,15 @@
 #define SEQ_NUM_BANKS 2
 #define SEQ_SAVE_DELAY 180  // 3 seconds at 60fps
 
+// Error codes
+#define SEQ_ERR_NONE 0
+#define SEQ_ERR_PARAM_RANGE 1
+#define SEQ_ERR_STEP_RANGE 2
+#define SEQ_ERR_STATE 3
+#define SEQ_ERR_SAVE 4
+#define SEQ_ERR_LOAD 5
+#define SEQ_ERR_BANK 6
+
 
 typedef enum {
     MENU_MAIN,
@@ -70,15 +79,29 @@ typedef struct {
 } CHANNEL_DATA;
 
 typedef struct {
+    CHANNEL_DATA bank_a[SEQ_NUM_CHANNELS];
+    CHANNEL_DATA bank_b[SEQ_NUM_CHANNELS];
+    UINT8 bank_a_exists;
+    UINT8 bank_b_exists;
+} PATTERN_BANKS;
+
+typedef struct {
+    CHANNEL_DATA channels[SEQ_NUM_CHANNELS];
+    UINT8 has_data;
+} PATTERN_BUFFER;
+
+typedef struct {
     BANK_ID current_bank;
     UINT8 is_switching;
     UINT8 switch_pending;
     UINT8 has_copy;
+    PATTERN_BANKS storage;
+    PATTERN_BUFFER copy_buffer;
     UINT8 cursor_x;       // For popup menu
     UINT8 cursor_y;       // For popup menu
     UINT8 confirm_cursor; // For YES/NO selection
+    UINT8 message_timer;  // For status messages
     PROMPT_STATE prompt_state;
-    CHANNEL_DATA copy_buffer[SEQ_NUM_CHANNELS];
 } BANK_DATA;
 
 typedef struct {
@@ -99,7 +122,7 @@ typedef struct {
     UINT8 envelope_duration[SEQ_NUM_CHANNELS];    // Track envelope duration for each channel
     INT8 global_transpose;    // Global transpose value (-12 to +12 semitones)
     UINT8 chord_mode;        // Chord mode state (0 = OFF, 1 = ON)
-	UINT8 last_parameter;    // New: Track last parameter
+    UINT8 last_parameter;    // New: Track last parameter
     UINT8 last_cursor_pos;   // New: Track last cursor
     CHANNEL_DATA channels[SEQ_NUM_CHANNELS];
     BANK_DATA bank_data;
@@ -113,23 +136,5 @@ void cleanup_sequencer(void);
 void toggle_sequencer_debug(void);
 void draw_sequence_display(void);
 const char* get_last_error(void);
-
-// Bank functions
-void init_bank_system(void);
-void switch_pattern_bank(BANK_ID new_bank);
-void handle_bank_prompt(UINT8 joy);
-void draw_bank_prompt(void);
-void save_pattern_bank(void);
-void load_pattern_bank(void);
-void copy_pattern_bank(void);
-void clear_pattern_bank(void);
-
-#define SEQ_ERR_NONE 0
-#define SEQ_ERR_PARAM_RANGE 1
-#define SEQ_ERR_STEP_RANGE 2
-#define SEQ_ERR_STATE 3
-#define SEQ_ERR_SAVE 4
-#define SEQ_ERR_LOAD 5
-#define SEQ_ERR_BANK 6
 
 #endif

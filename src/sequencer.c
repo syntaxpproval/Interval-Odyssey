@@ -1,3 +1,36 @@
+// Display constants
+#define MAX_STATUS_LEN 20
+#define MAX_LABEL_LEN 8
+
+// Sequencer display positions
+#define SEQ_START_X 2
+#define SEQ_START_Y 4
+#define SEQ_POSITION_Y 3  // Position indicator row above sequence bars
+#define PARAM_START_Y 9   // Parameters start below sequencer
+
+// Pop-up menu positions
+#define POPUP_START_X 1
+#define POPUP_START_Y 2
+#define POPUP_WIDTH 18
+#define POPUP_HEIGHT 8
+#define OPTION_SAVE_X 5
+#define OPTION_COPY_X 10
+#define OPTION_ROW1_Y 4
+#define OPTION_ROW2_Y 5
+#define CONFIRM_ROW_Y 7
+
+// Tile definitions
+#define TILE_INACTIVE 47   // 'o' character from tileset
+#define TILE_ACTIVE 88     // 'x' character from tileset
+#define TILE_BLANK 0
+#define TILE_SELECTED 112  // Black tile for selected step
+
+// Channel identifiers
+#define TILE_CH1 TILE_ROMAN1
+#define TILE_CH2 TILE_ROMAN2
+#define TILE_CH3 TILE_ROMAN3
+#define TILE_CH4 TILE_ROMAN4
+
 #include <string.h>
 #include <stdio.h>
 #include "text.h"
@@ -22,10 +55,156 @@ static void update_step_visuals(void);
 static void handle_main_menu_input(UINT8 joy);
 static void handle_sub_menu_input(UINT8 joy);
 static void update_transpose_display(void);
+static void show_loading_message(void);
+static void clear_loading_message(void);
+static void show_status_message(const char* msg);
+static void handle_status_messages(void);
+static void save_current_pattern(void);
+static void load_current_pattern(void);
+static void copy_current_pattern(void);
+static void paste_pattern(void);
+static void clear_current_pattern(void);
+static void draw_popup_box(void);
+static void handle_popup_input(UINT8 joy);
 
+static void save_current_pattern(void) {
+    // Get pointer to current bank's storage
+    CHANNEL_DATA* dest = (sequencer.bank_data.current_bank == BANK_A) ?
+        sequencer.bank_data.storage.bank_a : sequencer.bank_data.storage.bank_b;
+    
+    // Copy all channel data
+    for(UINT8 i = 0; i < SEQ_NUM_CHANNELS; i++) {
+        // Deep copy all data for the channel
+        dest[i] = sequencer.channels[i];  // Struct copy
+        
+        // Ensure all steps are copied
+        for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
+            dest[i].steps[step] = sequencer.channels[i].steps[step];
+        }
+    }
+    
+    // Mark bank as having data
+    if(sequencer.bank_data.current_bank == BANK_A) {
+        sequencer.bank_data.storage.bank_a_exists = 1;
+    } else {
+        sequencer.bank_data.storage.bank_b_exists = 1;
+    }
+}
 
+static void load_current_pattern(void) {
+    // Get pointer to current bank's storage
+    CHANNEL_DATA* src = (sequencer.bank_data.current_bank == BANK_A) ?
+        sequencer.bank_data.storage.bank_a : sequencer.bank_data.storage.bank_b;
+    
+    // Check if bank has data
+    if((sequencer.bank_data.current_bank == BANK_A && !sequencer.bank_data.storage.bank_a_exists) ||
+       (sequencer.bank_data.current_bank == BANK_B && !sequencer.bank_data.storage.bank_b_exists)) {
+        return;  // No data to load
+    }
+    
+    // Copy all channel data
+    for(UINT8 i = 0; i < SEQ_NUM_CHANNELS; i++) {
+        // Deep copy all data for the channel
+        sequencer.channels[i] = src[i];  // Struct copy
+        
+        // Ensure all steps are copied
+        for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
+            sequencer.channels[i].steps[step] = src[i].steps[step];
+        }
+    }
+    
+    // Force redraw since pattern changed
+    sequencer.needs_redraw = 1;
+}
 
-// Display constants
+static void copy_current_pattern(void) {
+    UINT8 i;
+    
+    // Copy all channel data to buffer
+    for(i = 0; i < SEQ_NUM_CHANNELS; i++) {
+        sequencer.bank_data.copy_buffer.channels[i] = sequencer.channels[i];  // Struct copy
+    }
+    
+    // Mark buffer as having data
+    sequencer.bank_data.copy_buffer.has_data = 1;
+    sequencer.bank_data.has_copy = 1;
+}
+
+static void paste_pattern(void) {
+    UINT8 i;
+    
+    // Only paste if we have data
+    if(!sequencer.bank_data.copy_buffer.has_data) return;
+    
+    // Copy all channel data from buffer
+    for(i = 0; i < SEQ_NUM_CHANNELS; i++) {
+        sequencer.channels[i] = sequencer.bank_data.copy_buffer.channels[i];  // Struct copy
+    }
+}
+
+static void clear_current_pattern(void) {
+    UINT8 ch, step;
+    
+    // Reset all channels to default values
+    for(ch = 0; ch < SEQ_NUM_CHANNELS; ch++) {
+        sequencer.channels[ch].enabled = 1;
+        sequencer.channels[ch].muted = 0;
+        
+        // Reset type based on channel
+        switch(ch) {
+            case 0:
+            case 1:
+                sequencer.channels[ch].type = TYPE_SQUARE;
+                break;
+            case 2:
+                sequencer.channels[ch].type = TYPE_WAVE;
+                break;
+            case 3:
+                sequencer.channels[ch].type = TYPE_NOISE;
+                break;
+        }
+        
+        // Clear all steps
+        for(step = 0; step < SEQ_MAX_STEPS; step++) {
+            sequencer.channels[ch].steps[step].armed = 0;
+            sequencer.channels[ch].steps[step].note = 24;  // C5
+            sequencer.channels[ch].steps[step].volume = 15;
+            sequencer.channels[ch].steps[step].attack = 0;
+            sequencer.channels[ch].steps[step].decay = 1;
+        }
+    }
+}
+
+// Status message functions
+static void show_loading_message(void) {
+    wait_vbl_done();
+    fill_bkg_rect(13, 17, 8, 1, 0);  // Clear area first
+    draw_text(13, 17, "Loading...");
+}
+
+static void clear_loading_message(void) {
+    wait_vbl_done();
+    fill_bkg_rect(13, 17, 8, 1, 0);  // Clear "Loading..." text area
+}
+
+static void show_status_message(const char* msg) {
+    wait_vbl_done();
+    fill_bkg_rect(7, CONFIRM_ROW_Y, 6, 1, TILE_BLANK);  // Clear message area
+    draw_text(7, CONFIRM_ROW_Y, msg);
+    sequencer.bank_data.message_timer = SEQ_SAVE_DELAY;  // Reset timer
+}
+
+static void handle_status_messages(void) {
+    if(sequencer.bank_data.message_timer > 0) {
+        sequencer.bank_data.message_timer--;
+        if(sequencer.bank_data.message_timer == 0) {
+            // Clear message when timer expires
+            wait_vbl_done();
+            fill_bkg_rect(7, CONFIRM_ROW_Y, 6, 1, TILE_BLANK);
+        }
+    }
+}
+
 #define MAX_STATUS_LEN 20
 #define MAX_LABEL_LEN 8
 
@@ -511,6 +690,13 @@ static void draw_popup_box(void) {
     draw_text(OPTION_COPY_X, OPTION_ROW1_Y, sequencer.bank_data.has_copy ? "PASTE" : "COPY");
     draw_text(OPTION_SAVE_X, OPTION_ROW2_Y, "LOAD");
     draw_text(OPTION_COPY_X, OPTION_ROW2_Y, "CLEAR");
+    
+    // Initialize cursor position
+    sequencer.bank_data.cursor_x = 0;
+    sequencer.bank_data.cursor_y = 0;
+    
+    // Draw initial cursor
+    draw_text(OPTION_SAVE_X - 1, OPTION_ROW1_Y, ">");
 }
 
 void draw_sequence_display(void) {
@@ -636,93 +822,149 @@ static void update_parameter_display(void) {
     }
 }
 
+static void switch_bank(BANK_ID new_bank) {
+    // First, save current bank's state
+    BANK_ID old_bank = sequencer.bank_data.current_bank;
+    CHANNEL_DATA* old_bank_storage = (old_bank == BANK_A) ?
+        sequencer.bank_data.storage.bank_a : sequencer.bank_data.storage.bank_b;
+    
+    // Save current pattern to the old bank's storage
+    for(UINT8 i = 0; i < SEQ_NUM_CHANNELS; i++) {
+        old_bank_storage[i] = sequencer.channels[i];  // Struct copy
+    }
+    
+    // Mark old bank as having data
+    if(old_bank == BANK_A) {
+        sequencer.bank_data.storage.bank_a_exists = 1;
+    } else {
+        sequencer.bank_data.storage.bank_b_exists = 1;
+    }
+    
+    // Switch to new bank
+    sequencer.bank_data.current_bank = new_bank;
+    
+    // Load new bank's data if it exists, otherwise clear
+    if((new_bank == BANK_A && sequencer.bank_data.storage.bank_a_exists) ||
+       (new_bank == BANK_B && sequencer.bank_data.storage.bank_b_exists)) {
+        CHANNEL_DATA* new_bank_storage = (new_bank == BANK_A) ?
+            sequencer.bank_data.storage.bank_a : sequencer.bank_data.storage.bank_b;
+        
+        // Load pattern from new bank's storage
+        for(UINT8 i = 0; i < SEQ_NUM_CHANNELS; i++) {
+            sequencer.channels[i] = new_bank_storage[i];  // Struct copy
+        }
+    } else {
+        clear_current_pattern();
+    }
+    
+    update_pattern_display();
+    sequencer.needs_redraw = 1;
+}
 
 static void handle_popup_input(UINT8 joy) {
+    static PROMPT_STATE pending_operation = PROMPT_NONE;
     
-    // Clear previous cursor
-    if(sequencer.bank_data.prompt_state != PROMPT_CONFIRM) {
-        draw_text(sequencer.bank_data.cursor_x ? OPTION_COPY_X - 1 : OPTION_SAVE_X - 1,
-                  sequencer.bank_data.cursor_y ? OPTION_ROW2_Y : OPTION_ROW1_Y, " ");
-    }
-    
-    // Handle navigation
-    if(joy & J_UP && sequencer.bank_data.cursor_y > 0) {
-        sequencer.bank_data.cursor_y--;
-    }
-    if(joy & J_DOWN && sequencer.bank_data.cursor_y < 1) {
-        sequencer.bank_data.cursor_y++;
-    }
-    if(joy & J_LEFT && sequencer.bank_data.cursor_x > 0) {
-        sequencer.bank_data.cursor_x--;
-    }
-    if(joy & J_RIGHT && sequencer.bank_data.cursor_x < 1) {
-        sequencer.bank_data.cursor_x++;
-    }
-    
-    // Draw new cursor position
-    if(sequencer.bank_data.prompt_state != PROMPT_CONFIRM) {
-        draw_text(sequencer.bank_data.cursor_x ? OPTION_COPY_X - 1 : OPTION_SAVE_X - 1,
-                  sequencer.bank_data.cursor_y ? OPTION_ROW2_Y : OPTION_ROW1_Y, ">");
-    }
-    
-    // Handle selection
-    if(joy & J_A) {
-        // Determine selected option
-        if(sequencer.bank_data.cursor_y == 0) {  // Top row
-            if(sequencer.bank_data.cursor_x == 0) {  // SAVE
-                sequencer.bank_data.prompt_state = PROMPT_CONFIRM;
-                draw_text(7, CONFIRM_ROW_Y, "YES NO");
-                draw_text(6, CONFIRM_ROW_Y, ">");
-            } else {  // COPY/PASTE
-                if(sequencer.bank_data.has_copy) {
-                    sequencer.bank_data.prompt_state = PROMPT_PASTE;
-                } else {
-                    sequencer.bank_data.prompt_state = PROMPT_COPY;
-                }
-                draw_text(7, CONFIRM_ROW_Y, "YES NO");
-                draw_text(6, CONFIRM_ROW_Y, ">");
-            }
-        } else {  // Bottom row
-            if(sequencer.bank_data.cursor_x == 0) {  // LOAD
-                sequencer.bank_data.prompt_state = PROMPT_LOAD;
-                draw_text(7, CONFIRM_ROW_Y, "YES NO");
-                draw_text(6, CONFIRM_ROW_Y, ">");
-            } else {  // CLEAR
-                sequencer.bank_data.prompt_state = PROMPT_CLEAR;
-                draw_text(7, CONFIRM_ROW_Y, "YES NO");
-                draw_text(6, CONFIRM_ROW_Y, ">");
-            }
-        }
-    }
-    
-    // Handle confirmation
-    if(sequencer.bank_data.prompt_state == PROMPT_CONFIRM) {
+    // Only handle initial menu cursor if not in confirmation mode
+    if(pending_operation == PROMPT_NONE) {
         // Clear previous cursor
-        draw_text(sequencer.bank_data.confirm_cursor ? 10 : 6, CONFIRM_ROW_Y, " ");
+        draw_text(sequencer.bank_data.cursor_x ? OPTION_COPY_X - 1 : OPTION_SAVE_X - 1,
+                 sequencer.bank_data.cursor_y ? OPTION_ROW2_Y : OPTION_ROW1_Y, " ");
         
-        if(joy & J_LEFT && sequencer.bank_data.confirm_cursor > 0) {
-            sequencer.bank_data.confirm_cursor--;
-        }
-        if(joy & J_RIGHT && sequencer.bank_data.confirm_cursor < 1) {
-            sequencer.bank_data.confirm_cursor++;
-        }
+        // Handle navigation
+        if(joy & J_UP && sequencer.bank_data.cursor_y > 0) sequencer.bank_data.cursor_y--;
+        if(joy & J_DOWN && sequencer.bank_data.cursor_y < 1) sequencer.bank_data.cursor_y++;
+        if(joy & J_LEFT && sequencer.bank_data.cursor_x > 0) sequencer.bank_data.cursor_x--;
+        if(joy & J_RIGHT && sequencer.bank_data.cursor_x < 1) sequencer.bank_data.cursor_x++;
         
         // Draw new cursor
-        draw_text(sequencer.bank_data.confirm_cursor ? 10 : 6, CONFIRM_ROW_Y, ">");
+        draw_text(sequencer.bank_data.cursor_x ? OPTION_COPY_X - 1 : OPTION_SAVE_X - 1,
+                 sequencer.bank_data.cursor_y ? OPTION_ROW2_Y : OPTION_ROW1_Y, ">");
+
+        // Handle initial selection
+        if(joy & J_A) {
+            // Determine operation based on cursor position
+            if(sequencer.bank_data.cursor_y == 0) {  // Top row
+                if(sequencer.bank_data.cursor_x == 0) {  // SAVE
+                    pending_operation = PROMPT_SAVE;
+                } else {  // COPY/PASTE
+                    pending_operation = sequencer.bank_data.has_copy ? PROMPT_PASTE : PROMPT_COPY;
+                }
+            } else {  // Bottom row
+                if(sequencer.bank_data.cursor_x == 0) {  // LOAD
+                    pending_operation = PROMPT_LOAD;
+                } else {  // CLEAR
+                    pending_operation = PROMPT_CLEAR;
+                }
+            }
+            
+            // Show YES/NO prompt
+            fill_bkg_rect(6, CONFIRM_ROW_Y, 6, 1, TILE_BLANK);
+            draw_text(7, CONFIRM_ROW_Y, "YES NO");
+            draw_text(6, CONFIRM_ROW_Y, ">");
+            sequencer.bank_data.confirm_cursor = 0;
+        }
+    } else {
+        // Handle YES/NO confirmation
+        if(joy & J_LEFT && sequencer.bank_data.confirm_cursor > 0) {
+            draw_text(10, CONFIRM_ROW_Y, " ");  // Clear old cursor
+            sequencer.bank_data.confirm_cursor = 0;
+            draw_text(6, CONFIRM_ROW_Y, ">");  // Draw new cursor
+        }
+        if(joy & J_RIGHT && sequencer.bank_data.confirm_cursor < 1) {
+            draw_text(6, CONFIRM_ROW_Y, " ");  // Clear old cursor
+            sequencer.bank_data.confirm_cursor = 1;
+            draw_text(10, CONFIRM_ROW_Y, ">");  // Draw new cursor
+        }
+        
+        if(joy & J_A) {
+            if(!sequencer.bank_data.confirm_cursor) {  // YES selected
+                switch(pending_operation) {
+                    case PROMPT_SAVE:
+                        save_current_pattern();
+                        show_status_message("SAVED!");
+                        break;
+                    case PROMPT_LOAD:
+                        if((sequencer.bank_data.current_bank == BANK_A && !sequencer.bank_data.storage.bank_a_exists) ||
+                           (sequencer.bank_data.current_bank == BANK_B && !sequencer.bank_data.storage.bank_b_exists)) {
+                            show_status_message("BLANK");
+                        } else {
+                            load_current_pattern();
+                            show_status_message("LOADED!");
+                        }
+                        break;
+                    case PROMPT_COPY:
+                        copy_current_pattern();
+                        show_status_message("COPIED!");
+                        break;
+                    case PROMPT_PASTE:
+                        paste_pattern();
+                        show_status_message("PASTED!");
+                        break;
+                    case PROMPT_CLEAR:
+                        clear_current_pattern();
+                        show_status_message("CLEARED!");
+                        break;
+                }
+            }
+            // Clear confirmation state
+            pending_operation = PROMPT_NONE;
+            fill_bkg_rect(6, CONFIRM_ROW_Y, 6, 1, TILE_BLANK);
+            sequencer.needs_redraw = 1;
+        }
         
         if(joy & J_B) {
-            // Return to main popup menu
-            sequencer.bank_data.prompt_state = PROMPT_SAVE;
+            pending_operation = PROMPT_NONE;
             fill_bkg_rect(6, CONFIRM_ROW_Y, 6, 1, TILE_BLANK);
         }
-    } else if(joy & J_B) {
-        // Exit popup menu
+    }
+    
+    // Global B button handling
+    if(pending_operation == PROMPT_NONE && (joy & J_B)) {
         sequencer.bank_data.prompt_state = PROMPT_NONE;
         sequencer.needs_redraw = 1;
     }
 }
 
-static void handle_popup_input(UINT8 joy);
 static void handle_main_menu_input(UINT8 joy) {
     UINT8 old_cursor = sequencer.cursor;
     UINT8 old_tempo = sequencer.tempo;
@@ -747,23 +989,23 @@ static void handle_main_menu_input(UINT8 joy) {
         draw_main_menu();
     }
     
-    // Handle PATTERN bank switching
+// Handle PATTERN bank switching
     if(sequencer.cursor == 5) {  // PATTERN position
         if(joy & J_RIGHT && sequencer.bank_data.current_bank == BANK_A) {
-            if(!sequencer.is_playing || sequencer.playback_step == 15) {
-                sequencer.bank_data.current_bank = BANK_B;
-                update_pattern_display();
+            if(!sequencer.is_playing) {
+                switch_bank(BANK_B);
             } else {
                 sequencer.bank_data.is_switching = 1;
                 sequencer.bank_data.switch_pending = 1;
+                show_loading_message();
             }
         } else if(joy & J_LEFT && sequencer.bank_data.current_bank == BANK_B) {
-            if(!sequencer.is_playing || sequencer.playback_step == 15) {
-                sequencer.bank_data.current_bank = BANK_A;
-                update_pattern_display();
+            if(!sequencer.is_playing) {
+                switch_bank(BANK_A);
             } else {
                 sequencer.bank_data.is_switching = 1;
                 sequencer.bank_data.switch_pending = 1;
+                show_loading_message();
             }
         }
     }
@@ -1017,15 +1259,18 @@ static void update_step_visuals(void) {
 void update_sequencer(void) {
     static UINT8 last_playback_step = 0;
     
-    // Handle pending bank switch
+// Handle status messages
+    handle_status_messages();
+    
+// Handle pending bank switch
     if(sequencer.bank_data.is_switching && sequencer.bank_data.switch_pending) {
-        if(sequencer.playback_step == 15) {
-            // Switch banks at end of pattern
-            sequencer.bank_data.current_bank = 
-                (sequencer.bank_data.current_bank == BANK_A) ? BANK_B : BANK_A;
-            update_pattern_display();
+        if(sequencer.playback_step == 15) {  // Switch at end of pattern
+            BANK_ID new_bank = (sequencer.bank_data.current_bank == BANK_A) ? BANK_B : BANK_A;
+            switch_bank(new_bank);
+            
             sequencer.bank_data.is_switching = 0;
             sequencer.bank_data.switch_pending = 0;
+            clear_loading_message();
         }
     }
     
