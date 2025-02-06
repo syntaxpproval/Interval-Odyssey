@@ -1,2 +1,43 @@
- Interval Odyssey is a Game Boy game being developed using GBDK2020, focusing on music theory learning through gameplay mechanics. The game uses a room-based navigation system where players traverse through interconnected rooms, collecting keys and reaching gates. Each stage contains key rooms, gate rooms, and various other room types including combat, bonus, and corridor rooms, with a central staging room as the starting point.
-The core gameplay loop involves finding a key in one of the designated key rooms, which then allows interaction with a gate in the gate room. Upon reaching the gate with the key, players must complete a music-based quiz (identifying chords/intervals) to progress. The game features a stage transition system, where completing a gate room's quiz can lead to the next stage, resetting the key/gate mechanics for the new stage. The project uses a template-based room generation system, and includes various subsystems for player movement, collision detection, sound effects, and quiz interactions.
+# Interval Odyssey
+
+## Overview
+Interval Odyssey is a Game Boy game developed using GBDK2020, focusing on music theory learning through gameplay mechanics. The game combines exploration, puzzle-solving, and music education elements.
+
+## Core Components
+
+### Navigation System
+- Room-based exploration
+- Interconnected rooms with various types
+- Central staging room as starting point
+
+### Room Types
+- Key rooms
+- Gate rooms
+- Combat rooms
+- Bonus rooms
+- Corridor rooms
+
+### Music Components
+- 16-step sequencer
+- Channel-based sound system
+- Parameter control interface
+- Music theory quiz system
+
+### Progression System
+- Key collection
+- Gate unlocking
+- Stage transitions
+- Music-based quiz challenges
+
+## Current Development
+- Implementing enhanced sequencer interface
+- Refining music parameter controls
+- Channel sound system development
+- Menu navigation improvements
+
+## Technical Details
+- Built with GBDK2020
+- Template-based room generation
+- Collision detection system
+- Sound effects subsystem
+- Quiz interaction framework

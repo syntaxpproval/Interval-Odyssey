@@ -3,78 +3,126 @@
 ## Overview
 The sequencer is a core component of the music mode, allowing players to create and modify musical patterns using the Game Boy's sound channels.
 
-## Current Status
-- Working range: C4-G8 (implemented)
-- Partial range: C3-B3 (needs fixing)
-- Single channel support (CH1)
-- Basic step sequencing
+## Current Implementation Status
+
+### Sound Channels
+- Channel 1: Implemented (Square wave, 50% duty)
+- Channel 2: Implemented (Square wave, 25% duty)
+- Channel 3: Planned (Wave)
+- Channel 4: Planned (Noise)
+
+### Note Range
+- Working range: C5-G8
+- Partial range: C4-B4 (working)
+- Problematic range: A3-B3 (plays incorrectly)
+
+### Sequencer Features
+- 16-step sequence per channel
+- Independent channel patterns
+- Channel muting
+- Test tone preview
 - Tempo control (60-240 BPM)
 - Visual step feedback
 
+### Parameters
+#### Implemented
+- Note selection (A3-G8)
+- Step arming/disarming
+- Channel muting
+- Channel selection
+
+#### Pending Implementation
+- Attack
+- Decay
+- Volume control
+- Channel-specific parameters
+- Wave channel settings
+- Noise channel settings
+
 ## Interface Layout
 
-### Main Grid
-- 4x4 grid of steps (16 total steps)
-- Each step can be armed (active) or unarmed (inactive)
-- Selected step blinks
-- Each grid box is 2x2 tiles
+### Main Menu
+- Channel selection (1-4)
+- Tempo control (♪=60-240)
+- Grid display
 
-### Parameter Section
-- Channel notes (C1-C4): Displays and edits pitch for each channel
-- Tempo (T): Controls playback speed (60-240 BPM)
-- Current values displayed next to parameters
-- Arrow cursor indicates selected parameter
+### Parameter Menu
+- Step control
+- Note selection
+- Attack (pending)
+- Decay (pending)
+- Volume (pending)
+- Type selection
+- Mute toggle
+- Exit to channel select
 
-### ADSR Section (Planned)
-- Accessible via SELECT button
-- A (Attack): Initial volume ramp
-- D (Decay): Volume fall time
-- S (Sustain): Held volume level
-
-### Channel Info Section (Planned)
-- Accessible via START button
-- C1:DUTY - Channel 1 duty cycle settings
-- C2:DUTY2 - Channel 2 duty cycle settings
-- C3:WAVE - Channel 3 wave selection
-- C4:NOISE - Channel 4 noise parameters
+### Display Elements
+- Sequencer grid (4x4)
+- Parameter values (centered display)
+- Current channel indicator
+- Context-sensitive controls
 
 ## Controls
 
 ### Navigation
 - Up/Down: Move between parameters
 - Left/Right: Modify selected parameter
-- A: Enter grid mode/toggle step
-- B: Return to parameter mode
-- SELECT: Access ADSR section
-- START: Access channel parameters
+- A: Toggle/Activate
+- SELECT: Test tone
+- START: Play/Stop sequence
 
-### Grid Mode
-- D-Pad: Navigate grid
-- A: Toggle step armed/unarmed
-- B: Return to parameter mode
-
-### Parameter Values
-- Notes: C3-G8 chromatic range
+### Parameter Ranges
+- Notes: A3-G8 (chromatic)
 - Tempo: 60-240 BPM
-- ADSR: 0-15 range (planned)
+- Attack/Decay: 0-15 (pending)
+- Volume: 0-15 (pending)
 
-## Implementation Notes
+## Technical Notes
 
-### Sound System
-- Using exact GB hardware values (44-2006)
-- Full range support (C3-G8)
-- Proper frequency conversion
-- Volume control pending
+### Sound Implementation
+- Hardware register direct control
+- Channel 1: NR10-NR14
+- Channel 2: NR21-NR24
+- Duty cycle differentiation
+- Channel muting via volume control
 
 ### Known Issues
-1. Notes B3-C3 playing incorrectly
-2. Single channel limitation
-3. No ADSR implementation
-4. Limited channel parameters
+1. Screen Update Performance
+   - Inefficient redraw system
+   - Multiple redundant updates
+   - High CPU usage during editing
 
-### Next Steps
-1. Fix lower register notes
-2. Implement multi-channel support
-3. Add ADSR controls
-4. Expand channel parameters
-5. Add pattern storage/recall
+2. Audio Issues
+   - Low register note calculation errors
+   - Phase issues in multi-channel playback
+   - Limited sound parameter control
+
+3. Interface Limitations
+   - Step editing efficiency
+   - Grid visualization updates
+   - Parameter control granularity
+
+### Future Enhancements
+1. Technical Improvements
+   - Optimize screen updates
+   - Implement display buffering
+   - Reduce CPU overhead
+   - Fix low register calculations
+
+2. Feature Additions
+   - Channel 3 & 4 support
+   - Sound parameter implementation
+   - Chord mode
+   - Button macro system
+
+3. UI Enhancements
+   - Improved grid editing
+   - Better visual feedback
+   - More intuitive controls
+   - Enhanced parameter display
+
+## Development References
+- GameBoy CPU Manual
+- Pan Docs (Sound Controller)
+- BGB Debugger notes
+- Hardware register map

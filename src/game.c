@@ -99,7 +99,7 @@ void handle_menu_input(UINT8 joy) {
     static UINT8 old_joy = 0xFF;
     static UINT8 held_frames = 0;
     
-    if(joy != old_joy || (held_frames > 15)) {
+    if(joy != old_joy || (held_frames > 30)) {  // Increased delay for held buttons
         if(joy & J_UP && menu_selection > 0) {
             menu_selection--;
             if(settings.sound_fx_enabled) play_menu_sound();
@@ -113,7 +113,7 @@ void handle_menu_input(UINT8 joy) {
             held_frames = 0;
         }
         
-        if((joy & J_START || joy & J_A) && !(old_joy & J_START || old_joy & J_A)) {
+        if(((joy & J_START) || (joy & J_A)) && !((old_joy & J_START) || (old_joy & J_A))) {
             if(settings.sound_fx_enabled) play_menu_sound();
             
             if(initial_seed == 0) {

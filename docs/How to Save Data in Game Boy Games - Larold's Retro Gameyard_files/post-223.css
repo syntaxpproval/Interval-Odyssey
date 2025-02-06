@@ -1,0 +1,16 @@
+.elementor-223 .elementor-element.elementor-element-5460220{--display:flex;--flex-direction:row;--container-widget-width:calc( ( 1 - var( --container-widget-flex-grow ) ) * 100% );--container-widget-height:100%;--container-widget-flex-grow:1;--container-widget-align-self:stretch;--flex-wrap-mobile:wrap;--justify-content:space-evenly;--align-items:flex-start;--gap:0rem 2.5rem;--row-gap:0rem;--column-gap:2.5rem;--margin-top:5rem;--margin-bottom:0rem;--margin-left:0rem;--margin-right:0rem;--padding-top:5rem;--padding-bottom:5rem;--padding-left:5rem;--padding-right:5rem;}.elementor-223 .elementor-element.elementor-element-5460220:not(.elementor-motion-effects-element-type-background), .elementor-223 .elementor-element.elementor-element-5460220 > .elementor-motion-effects-container > .elementor-motion-effects-layer{background-color:var( --e-global-color-text );}.elementor-223 .elementor-element.elementor-element-ffede40{--grid-columns:1;width:var( --container-widget-width, 500px );max-width:500px;--container-widget-width:500px;--container-widget-flex-grow:0;}.elementor-223 .elementor-element.elementor-element-e9651c8{color:#FFFFFF;}.elementor-223 .elementor-element.elementor-element-5e8031e{text-align:left;color:#FFFFFF;}.elementor-theme-builder-content-area{height:400px;}.elementor-location-header:before, .elementor-location-footer:before{content:"";display:table;clear:both;}@media(max-width:1024px){.elementor-223 .elementor-element.elementor-element-ffede40{--grid-columns:2;}}@media(max-width:767px){.elementor-223 .elementor-element.elementor-element-ffede40{--grid-columns:1;}}/* Start custom CSS for text-editor, class: .elementor-element-e9651c8 */.elementor-223 .elementor-element.elementor-element-e9651c8 a{
+    color:white !important;
+    text-decoration: underline;
+}/* End custom CSS */
+/* Start custom CSS for text-editor, class: .elementor-element-5e8031e */.elementor-223 .elementor-element.elementor-element-5e8031e a{
+    color:white !important;
+    text-decoration: underline;
+}/* End custom CSS */
+/* Start custom CSS for container, class: .elementor-element-5460220 */.elementor-223 .elementor-element.elementor-element-5460220 ul{
+    list-style-type:none;
+    padding-left:0;
+    margin-left:0;
+}
+.elementor-223 .elementor-element.elementor-element-5460220 li{
+    list-style-type:none;
+}/* End custom CSS */

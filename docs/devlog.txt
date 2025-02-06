@@ -1,0 +1,47 @@
+Development Log - Interval Odyssey
+============================
+
+Session 2024-02-04
+-----------------
+
+Current Issues:
+1. Input Handling:
+   - Very fast/sensitive up/down movement in Main Menu
+   - A button not working for Music Mode or main game selection
+   - These issues appeared after SRAM implementation
+
+2. ROM Banking/Build Issues:
+   - Warning about overflow in implicit constant conversion in sequencer.c
+   - ROM size issues when using ROM banking
+   - Current workaround: removed ROM banking (-Wf-bo4) but kept SRAM banking (-Wf-ba4)
+
+3. SRAM Implementation:
+   - Basic SRAM structure is in place but functionality untested due to build issues
+   - Need to verify pattern saving/loading once build issues are resolved
+
+Goals for Next Session:
+1. Investigate input handling issues:
+   - Check if SRAM implementation in settings.c is affecting input
+   - Consider moving SRAM code to separate save_manager.c/h
+   - Review entire input handling chain for potential conflicts
+
+2. Resolve Build Configuration:
+   - Find proper balance between ROM banking and SRAM needs
+   - Current build works but with input issues
+   - May need to restructure code to better fit memory constraints
+
+3. Test and Complete SRAM Features:
+   - Once build is stable, test pattern saving/loading
+   - Verify bank A/B pattern preservation
+   - Implement permanent save functionality
+
+Technical Notes:
+- SRAM is configured with -Wf-ba4 flag
+- Removed ROM banking due to size issues
+- sequencer.c has an overflow warning that needs attention
+- Current focus should be on fixing input before proceeding with save functionality
+
+Next Steps:
+1. Focus on input handling first
+2. Then address ROM banking/memory organization
+3. Finally implement and test SRAM features

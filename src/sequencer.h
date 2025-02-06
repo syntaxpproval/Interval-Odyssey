@@ -79,6 +79,8 @@ typedef struct {
 } CHANNEL_DATA;
 
 typedef struct {
+	UINT16 magic_number;           // Magic number for validation
+    UINT8 version;                 // Version of save format
     CHANNEL_DATA bank_a[SEQ_NUM_CHANNELS];
     CHANNEL_DATA bank_b[SEQ_NUM_CHANNELS];
     UINT8 bank_a_exists;

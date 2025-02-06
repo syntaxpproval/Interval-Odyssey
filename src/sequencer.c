@@ -36,6 +36,7 @@
 #include "text.h"
 #include "sound.h"
 #include "sequencer.h"
+#include "settings.h"
 
 SEQUENCER_DATA sequencer;
 
@@ -140,6 +141,12 @@ static void paste_pattern(void) {
     for(i = 0; i < SEQ_NUM_CHANNELS; i++) {
         sequencer.channels[i] = sequencer.bank_data.copy_buffer.channels[i];  // Struct copy
     }
+    
+    // Reset copy flag after paste
+    sequencer.bank_data.has_copy = 0;
+    
+    // Force redraw since pattern changed
+    sequencer.needs_redraw = 1;
 }
 
 static void clear_current_pattern(void) {
@@ -288,9 +295,11 @@ static void play_sequencer_note(UINT8 channel, UINT8 note_idx) {
     // Configure envelope based on attack/decay
     UINT8 envelope = 0;
     if(step->attack > 0) {
-        envelope = (0x00 << 4) |       // Initial volume = 0
-                  0x08 |              // Direction = up
-                  (step->attack & 0x07) + 1;  // Step length 1-7
+        UINT8 attack_val = (step->attack & 0x07);
+        if(attack_val < 7) attack_val++;  // Ensure we don't overflow
+        envelope = (0x00 << 4) |      // Initial volume = 0
+                  0x08 |             // Direction = up
+                  attack_val;         // Step length 1-7
         
         // Set duration for envelope tracking
         sequencer.envelope_duration[channel] = (step->attack * 8) + (step->decay * 8);
@@ -299,8 +308,10 @@ static void play_sequencer_note(UINT8 channel, UINT8 note_idx) {
         envelope = (0x0F << 4);      // Initial volume = 15
         
         if(step->decay > 0) {
+            UINT8 decay_val = (step->decay & 0x07);
+            if(decay_val < 7) decay_val++;
             envelope |= (0x00) |      // Direction = down
-                       ((step->decay & 0x07) + 1); // Step length 1-7
+                       decay_val;     // Step length 1-7
         } else {
             envelope |= 0x00;         // No envelope change
         }
@@ -921,6 +932,7 @@ static void handle_popup_input(UINT8 joy) {
                 switch(pending_operation) {
                     case PROMPT_SAVE:
                         save_current_pattern();
+                        save_sram_data();  // Save to SRAM
                         show_status_message("SAVED!");
                         break;
                     case PROMPT_LOAD:
@@ -928,6 +940,7 @@ static void handle_popup_input(UINT8 joy) {
                            (sequencer.bank_data.current_bank == BANK_B && !sequencer.bank_data.storage.bank_b_exists)) {
                             show_status_message("BLANK");
                         } else {
+                            load_sram_data();  // Load from SRAM
                             load_current_pattern();
                             show_status_message("LOADED!");
                         }
@@ -946,10 +959,10 @@ static void handle_popup_input(UINT8 joy) {
                         break;
                 }
             }
-            // Clear confirmation state
+            // Clear confirmation state and redraw popup
             pending_operation = PROMPT_NONE;
             fill_bkg_rect(6, CONFIRM_ROW_Y, 6, 1, TILE_BLANK);
-            sequencer.needs_redraw = 1;
+            draw_popup_box();  // Redraw the popup menu
         }
         
         if(joy & J_B) {
@@ -1328,6 +1341,15 @@ void init_sequencer(void) {
    fill_bkg_rect(0, 0, 20, 18, 0);
    
    memset(&sequencer, 0, sizeof(SEQUENCER_DATA));
+   
+   // Load SRAM data if it exists
+   load_sram_data();
+   
+   // If current bank has data, load it
+   if((sequencer.bank_data.current_bank == BANK_A && sequencer.bank_data.storage.bank_a_exists) ||
+      (sequencer.bank_data.current_bank == BANK_B && sequencer.bank_data.storage.bank_b_exists)) {
+       load_current_pattern();
+   }
    
    sequencer.tempo = 120;
    sequencer.chord_mode = 0;
