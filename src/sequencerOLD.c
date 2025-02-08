@@ -67,14 +67,6 @@ static void paste_pattern(void);
 static void clear_current_pattern(void);
 static void draw_popup_box(void);
 static void handle_popup_input(UINT8 joy);
-static void clear_popup_window(void);
-
-static void clear_popup_window(void) {
-    wait_vbl_done();
-    for(UINT8 y = POPUP_START_Y; y < POPUP_START_Y + POPUP_HEIGHT; y++) {
-        fill_bkg_rect(POPUP_START_X, y, POPUP_WIDTH, 1, TILE_BLANK);
-    }
-}
 
 static void save_current_pattern(void) {
     // Get pointer to current bank's storage
@@ -134,21 +126,24 @@ static void copy_current_pattern(void) {
         sequencer.bank_data.copy_buffer.channels[i] = sequencer.channels[i];  // Struct copy
     }
     
-    // Mark buffer as having data - only set has_copy
+    // Mark buffer as having data
+    sequencer.bank_data.copy_buffer.has_data = 1;
     sequencer.bank_data.has_copy = 1;
-    sequencer.needs_redraw = 1;  // Force menu redraw to show PASTE
 }
 
 static void paste_pattern(void) {
     UINT8 i;
     
     // Only paste if we have data
-    if(!sequencer.bank_data.has_copy) return;
+    if(!sequencer.bank_data.copy_buffer.has_data) return;
     
     // Copy all channel data from buffer
     for(i = 0; i < SEQ_NUM_CHANNELS; i++) {
         sequencer.channels[i] = sequencer.bank_data.copy_buffer.channels[i];  // Struct copy
     }
+    
+    // Reset copy flag after paste
+    sequencer.bank_data.has_copy = 0;
     
     // Force redraw since pattern changed
     sequencer.needs_redraw = 1;
@@ -199,20 +194,11 @@ static void clear_loading_message(void) {
     fill_bkg_rect(13, 17, 8, 1, 0);  // Clear "Loading..." text area
 }
 
-static void show_confirmation_message(const char* msg) {
+static void show_status_message(const char* msg) {
     wait_vbl_done();
-    fill_bkg_rect(6, CONFIRM_ROW_Y, 8, 1, TILE_BLANK);  // Clear message area
+    fill_bkg_rect(7, CONFIRM_ROW_Y, 6, 1, TILE_BLANK);  // Clear message area
     draw_text(7, CONFIRM_ROW_Y, msg);
-    draw_text(15, CONFIRM_ROW_Y, "[A]");  // Add input prompt
-    sequencer.bank_data.waiting_for_confirm = 1;
-}
-
-static void show_status_message(const char* msg)
-{
-    wait_vbl_done();
-    fill_bkg_rect(6, CONFIRM_ROW_Y, 12, 1, TILE_BLANK);
-    draw_text(7, CONFIRM_ROW_Y, msg);
-    sequencer.bank_data.message_timer = SEQ_SAVE_DELAY;
+    sequencer.bank_data.message_timer = SEQ_SAVE_DELAY;  // Reset timer
 }
 
 static void handle_status_messages(void) {
@@ -221,11 +207,7 @@ static void handle_status_messages(void) {
         if(sequencer.bank_data.message_timer == 0) {
             // Clear message when timer expires
             wait_vbl_done();
-            fill_bkg_rect(6, CONFIRM_ROW_Y, 8, 1, TILE_BLANK);
-            // Force a redraw if we're not in the popup state
-            if(sequencer.bank_data.prompt_state == PROMPT_NONE) {
-                sequencer.needs_redraw = 1;
-            }
+            fill_bkg_rect(7, CONFIRM_ROW_Y, 6, 1, TILE_BLANK);
         }
     }
 }
@@ -891,22 +873,10 @@ static void switch_bank(BANK_ID new_bank) {
 }
 
 static void handle_popup_input(UINT8 joy) {
-    // Handle confirmation message state first
-    if(sequencer.bank_data.waiting_for_confirm) {
-        if(joy & J_A) {
-            // Clear the confirmation message
-            wait_vbl_done();
-            fill_bkg_rect(6, CONFIRM_ROW_Y, 12, 1, TILE_BLANK);  // Clear message and [A]
-            sequencer.bank_data.waiting_for_confirm = 0;
-            sequencer.bank_data.pending_operation = PROMPT_NONE;
-            // Ensure we're still in popup menu state
-            draw_popup_box();
-        }
-        return;  // Don't process other inputs while waiting for confirmation
-    }
+    static PROMPT_STATE pending_operation = PROMPT_NONE;
     
     // Only handle initial menu cursor if not in confirmation mode
-    if(sequencer.bank_data.pending_operation == PROMPT_NONE) {
+    if(pending_operation == PROMPT_NONE) {
         // Clear previous cursor
         draw_text(sequencer.bank_data.cursor_x ? OPTION_COPY_X - 1 : OPTION_SAVE_X - 1,
                  sequencer.bank_data.cursor_y ? OPTION_ROW2_Y : OPTION_ROW1_Y, " ");
@@ -926,15 +896,15 @@ static void handle_popup_input(UINT8 joy) {
             // Determine operation based on cursor position
             if(sequencer.bank_data.cursor_y == 0) {  // Top row
                 if(sequencer.bank_data.cursor_x == 0) {  // SAVE
-                    sequencer.bank_data.pending_operation = PROMPT_SAVE;
+                    pending_operation = PROMPT_SAVE;
                 } else {  // COPY/PASTE
-                    sequencer.bank_data.pending_operation = sequencer.bank_data.has_copy ? PROMPT_PASTE : PROMPT_COPY;
+                    pending_operation = sequencer.bank_data.has_copy ? PROMPT_PASTE : PROMPT_COPY;
                 }
             } else {  // Bottom row
                 if(sequencer.bank_data.cursor_x == 0) {  // LOAD
-                    sequencer.bank_data.pending_operation = PROMPT_LOAD;
+                    pending_operation = PROMPT_LOAD;
                 } else {  // CLEAR
-                    sequencer.bank_data.pending_operation = PROMPT_CLEAR;
+                    pending_operation = PROMPT_CLEAR;
                 }
             }
             
@@ -959,76 +929,51 @@ static void handle_popup_input(UINT8 joy) {
         
         if(joy & J_A) {
             if(!sequencer.bank_data.confirm_cursor) {  // YES selected
-                switch(sequencer.bank_data.pending_operation) {
+                switch(pending_operation) {
                     case PROMPT_SAVE:
                         save_current_pattern();
-                        save_sram_data();
+                        save_sram_data();  // Save to SRAM
                         show_status_message("SAVED!");
-                        wait_vbl_done();
-                        draw_popup_box();
-                        sequencer.bank_data.pending_operation = PROMPT_NONE;
+                        break;
+                    case PROMPT_LOAD:
+                        if((sequencer.bank_data.current_bank == BANK_A && !sequencer.bank_data.storage.bank_a_exists) ||
+                           (sequencer.bank_data.current_bank == BANK_B && !sequencer.bank_data.storage.bank_b_exists)) {
+                            show_status_message("BLANK");
+                        } else {
+                            load_sram_data();  // Load from SRAM
+                            load_current_pattern();
+                            show_status_message("LOADED!");
+                        }
                         break;
                     case PROMPT_COPY:
-    copy_current_pattern();
-    show_status_message("COPIED!");
-    sequencer.bank_data.pending_operation = PROMPT_NONE;
-    wait_vbl_done();
-    draw_popup_box();  // Redraw to show updated PASTE option
-    break;
-case PROMPT_PASTE:
-    paste_pattern();
-    show_status_message("PASTED!");
-    sequencer.bank_data.has_copy = 0;  // Only reset has_copy after successful paste
-    sequencer.bank_data.pending_operation = PROMPT_NONE;
-    wait_vbl_done();
-    draw_popup_box();  // Redraw to show updated COPY option
-    break;
-                    case PROMPT_LOAD:
-    load_sram_data();  // Ensure latest SRAM data is loaded
-    if((sequencer.bank_data.current_bank == BANK_A && !sequencer.bank_data.storage.bank_a_exists) ||
-       (sequencer.bank_data.current_bank == BANK_B && !sequencer.bank_data.storage.bank_b_exists)) {
-        show_status_message("BLANK");
-        sequencer.bank_data.pending_operation = PROMPT_NONE;
-    } else {
-        show_loading_message();
-        load_current_pattern();
-        sequencer.needs_redraw = 1;
-        clear_loading_message();  // Clear the loading message
-        show_status_message("LOADED!");
-        wait_vbl_done();
-        draw_popup_box();
-    }
-    break;
+                        copy_current_pattern();
+                        show_status_message("COPIED!");
+                        break;
+                    case PROMPT_PASTE:
+                        paste_pattern();
+                        show_status_message("PASTED!");
+                        break;
                     case PROMPT_CLEAR:
                         clear_current_pattern();
                         show_status_message("CLEARED!");
-                        wait_vbl_done();
-                        draw_popup_box();
-                        sequencer.bank_data.pending_operation = PROMPT_NONE;
-                        sequencer.needs_redraw = 1;
                         break;
                 }
             }
-            // For operations with no wait state, clear and redraw
-            if(!sequencer.bank_data.waiting_for_confirm) {
-                fill_bkg_rect(6, CONFIRM_ROW_Y, 6, 1, TILE_BLANK);
-                // Only clear pending operation if we're not waiting for confirmation
-                sequencer.bank_data.pending_operation = PROMPT_NONE;
-                draw_popup_box();
-            }
+            // Clear confirmation state and redraw popup
+            pending_operation = PROMPT_NONE;
+            fill_bkg_rect(6, CONFIRM_ROW_Y, 6, 1, TILE_BLANK);
+            draw_popup_box();  // Redraw the popup menu
         }
         
         if(joy & J_B) {
-            sequencer.bank_data.pending_operation = PROMPT_NONE;
+            pending_operation = PROMPT_NONE;
             fill_bkg_rect(6, CONFIRM_ROW_Y, 6, 1, TILE_BLANK);
         }
     }
     
     // Global B button handling
-    if(sequencer.bank_data.pending_operation == PROMPT_NONE && (joy & J_B)) {
+    if(pending_operation == PROMPT_NONE && (joy & J_B)) {
         sequencer.bank_data.prompt_state = PROMPT_NONE;
-        // Clear the popup window
-        clear_popup_window();
         sequencer.needs_redraw = 1;
     }
 }
@@ -1327,45 +1272,12 @@ static void update_step_visuals(void) {
 void update_sequencer(void) {
     static UINT8 last_playback_step = 0;
     
-// Handle operation delay
-    if(sequencer.bank_data.operation_delay > 0) {
-        sequencer.bank_data.operation_delay--;
-        if(sequencer.bank_data.operation_delay == 0) {
-            // Execute delayed operation
-            switch(sequencer.bank_data.pending_operation) {
-                case PROMPT_LOAD:
-                    load_sram_data();
-                    load_current_pattern();
-                    wait_vbl_done();
-                    draw_popup_box();
-                    draw_text(7, CONFIRM_ROW_Y, "LOADED!");
-                    draw_text(15, CONFIRM_ROW_Y, "[A]");
-                    sequencer.bank_data.waiting_for_confirm = 1;
-                    sequencer.needs_redraw = 1;
-                    break;
-                case PROMPT_PASTE:
-                    paste_pattern();
-                    // Reset copy flags to show COPY instead of PASTE
-                    sequencer.bank_data.has_copy = 0;
-                    sequencer.bank_data.copy_buffer.has_data = 0;
-                    wait_vbl_done();
-                    draw_popup_box();  // Redraw menu to show COPY option
-                    draw_text(7, CONFIRM_ROW_Y, "PASTED!");
-                    draw_text(15, CONFIRM_ROW_Y, "[A]");
-                    sequencer.bank_data.waiting_for_confirm = 1;
-                    sequencer.needs_redraw = 1;
-                    break;
-            }
-            sequencer.needs_redraw = 1;  // Ensure pattern display updates
-        }
-    }
-    
 // Handle status messages
     handle_status_messages();
     
 // Handle pending bank switch
     if(sequencer.bank_data.is_switching && sequencer.bank_data.switch_pending) {
-        if(sequencer.playback_step == (SEQ_MAX_STEPS - 1)) {  // Switch at end of pattern
+        if(sequencer.playback_step == 15) {  // Switch at end of pattern
             BANK_ID new_bank = (sequencer.bank_data.current_bank == BANK_A) ? BANK_B : BANK_A;
             switch_bank(new_bank);
             
@@ -1417,8 +1329,8 @@ void update_sequencer(void) {
         }
     }
     
-    // Only do full redraw when explicitly needed and not in popup menu
-    if(sequencer.needs_redraw && sequencer.bank_data.prompt_state == PROMPT_NONE) {
+    // Only do full redraw when explicitly needed
+    if(sequencer.needs_redraw) {
         draw_sequencer();
         sequencer.needs_redraw = 0;
     }
@@ -1430,17 +1342,14 @@ void init_sequencer(void) {
    
    memset(&sequencer, 0, sizeof(SEQUENCER_DATA));
    
-   // Initialize with clear patterns regardless of SRAM state
-   clear_current_pattern();
-   
-   // Initialize bank system
-   sequencer.bank_data.current_bank = BANK_A;
-   sequencer.bank_data.is_switching = 0;
-   sequencer.bank_data.switch_pending = 0;
-   sequencer.bank_data.has_copy = 0;
-   
-   // Load SRAM data but don't auto-load patterns
+   // Load SRAM data if it exists
    load_sram_data();
+   
+   // If current bank has data, load it
+   if((sequencer.bank_data.current_bank == BANK_A && sequencer.bank_data.storage.bank_a_exists) ||
+      (sequencer.bank_data.current_bank == BANK_B && sequencer.bank_data.storage.bank_b_exists)) {
+       load_current_pattern();
+   }
    
    sequencer.tempo = 120;
    sequencer.chord_mode = 0;
@@ -1454,10 +1363,7 @@ void init_sequencer(void) {
    sequencer.bank_data.cursor_x = 0;
    sequencer.bank_data.cursor_y = 0;
    sequencer.bank_data.confirm_cursor = 0;
-   sequencer.bank_data.operation_delay = 0;
-   sequencer.bank_data.waiting_for_confirm = 0;
    sequencer.bank_data.prompt_state = PROMPT_NONE;
-   sequencer.bank_data.pending_operation = PROMPT_NONE;
    sequencer.menu_layer = MENU_MAIN;
    sequencer.needs_redraw = 1;
    sequencer.last_parameter = 0;    // Initialize tracking

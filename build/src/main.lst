@@ -1,0 +1,147 @@
+                                      1 ;--------------------------------------------------------
+                                      2 ; File Created by SDCC : free open source ISO C Compiler 
+                                      3 ; Version 4.4.1 #14650 (MINGW64)
+                                      4 ;--------------------------------------------------------
+                                      5 	.module main
+                                      6 	.optsdcc -msm83
+                                      7 	
+                                      8 ;--------------------------------------------------------
+                                      9 ; Public variables in this module
+                                     10 ;--------------------------------------------------------
+                                     11 	.globl _main
+                                     12 	.globl _fill_bkg_rect
+                                     13 	.globl _set_sprite_data
+                                     14 	.globl _set_bkg_data
+                                     15 	.globl _wait_vbl_done
+                                     16 	.globl _joypad
+                                     17 ;--------------------------------------------------------
+                                     18 ; special function registers
+                                     19 ;--------------------------------------------------------
+                                     20 ;--------------------------------------------------------
+                                     21 ; ram data
+                                     22 ;--------------------------------------------------------
+                                     23 	.area _DATA
+                                     24 ;--------------------------------------------------------
+                                     25 ; ram data
+                                     26 ;--------------------------------------------------------
+                                     27 	.area _INITIALIZED
+                                     28 ;--------------------------------------------------------
+                                     29 ; absolute external ram data
+                                     30 ;--------------------------------------------------------
+                                     31 	.area _DABS (ABS)
+                                     32 ;--------------------------------------------------------
+                                     33 ; global & static initialisations
+                                     34 ;--------------------------------------------------------
+                                     35 	.area _HOME
+                                     36 	.area _GSINIT
+                                     37 	.area _GSFINAL
+                                     38 	.area _GSINIT
+                                     39 ;--------------------------------------------------------
+                                     40 ; Home
+                                     41 ;--------------------------------------------------------
+                                     42 	.area _HOME
+                                     43 	.area _HOME
+                                     44 ;--------------------------------------------------------
+                                     45 ; code
+                                     46 ;--------------------------------------------------------
+                                     47 	.area _CODE
+                                     48 ;src/main.c:7: void main(void) {
+                                     49 ;	---------------------------------
+                                     50 ; Function main
+                                     51 ; ---------------------------------
+    00000000                         52 _main::
+                                     53 ;src/main.c:9: SPRITES_8x8;
+    00000000 F0r00            [12]   54 	ldh	a, (_LCDC_REG + 0)
+    00000002 E6 FB            [ 8]   55 	and	a, #0xfb
+    00000004 E0r00            [12]   56 	ldh	(_LCDC_REG + 0), a
+                                     57 ;src/main.c:12: set_bkg_data(0, 2, tileset);
+    00000006 01r00r00         [12]   58 	ld	bc, #_tileset+0
+    00000009 C5               [16]   59 	push	bc
+    0000000A 21 00 02         [12]   60 	ld	hl, #0x200
+    0000000D E5               [16]   61 	push	hl
+    0000000E CDr00r00         [24]   62 	call	_set_bkg_data
+    00000011 E8 04            [16]   63 	add	sp, #4
+                                     64 ;src/main.c:13: set_sprite_data(0, 2, tileset);
+    00000013 C5               [16]   65 	push	bc
+    00000014 21 00 02         [12]   66 	ld	hl, #0x200
+    00000017 E5               [16]   67 	push	hl
+    00000018 CDr00r00         [24]   68 	call	_set_sprite_data
+    0000001B E8 04            [16]   69 	add	sp, #4
+                                     70 ;src/main.c:16: fill_bkg_rect(0, 0, 20, 18, 0);
+    0000001D AF               [ 4]   71 	xor	a, a
+    0000001E 67               [ 4]   72 	ld	h, a
+    0000001F 2E 12            [ 8]   73 	ld	l, #0x12
+    00000021 E5               [16]   74 	push	hl
+    00000022 3E 14            [ 8]   75 	ld	a, #0x14
+    00000024 F5               [16]   76 	push	af
+    00000025 33               [ 8]   77 	inc	sp
+    00000026 AF               [ 4]   78 	xor	a, a
+    00000027 0F               [ 4]   79 	rrca
+    00000028 F5               [16]   80 	push	af
+    00000029 CDr00r00         [24]   81 	call	_fill_bkg_rect
+    0000002C E8 05            [16]   82 	add	sp, #5
+                                     83 ;c:\gbdk\include\gb\gb.h:1875: shadow_OAM[nb].tile=tile;
+    0000002E 21r02r00         [12]   84 	ld	hl, #(_shadow_OAM + 2)
+    00000031 36 01            [12]   85 	ld	(hl), #0x01
+                                     86 ;c:\gbdk\include\gb\gb.h:1961: OAM_item_t * itm = &shadow_OAM[nb];
+    00000033 21r00r00         [12]   87 	ld	hl, #_shadow_OAM
+                                     88 ;c:\gbdk\include\gb\gb.h:1962: itm->y=y, itm->x=x;
+    00000036 3E 48            [ 8]   89 	ld	a, #0x48
+    00000038 22               [ 8]   90 	ld	(hl+), a
+    00000039 36 50            [12]   91 	ld	(hl), #0x50
+                                     92 ;src/main.c:23: SHOW_BKG;
+    0000003B F0r00            [12]   93 	ldh	a, (_LCDC_REG + 0)
+    0000003D F6 01            [ 8]   94 	or	a, #0x01
+    0000003F E0r00            [12]   95 	ldh	(_LCDC_REG + 0), a
+                                     96 ;src/main.c:24: SHOW_SPRITES;
+    00000041 F0r00            [12]   97 	ldh	a, (_LCDC_REG + 0)
+    00000043 F6 02            [ 8]   98 	or	a, #0x02
+    00000045 E0r00            [12]   99 	ldh	(_LCDC_REG + 0), a
+                                    100 ;src/main.c:25: DISPLAY_ON;
+    00000047 F0r00            [12]  101 	ldh	a, (_LCDC_REG + 0)
+    00000049 F6 80            [ 8]  102 	or	a, #0x80
+    0000004B E0r00            [12]  103 	ldh	(_LCDC_REG + 0), a
+                                    104 ;src/main.c:28: UINT8 x = SPRITE_START_X;
+                                    105 ;src/main.c:29: UINT8 y = SPRITE_START_Y;
+    0000004D 01 50 48         [12]  106 	ld	bc, #0x4850
+                                    107 ;src/main.c:32: while(1) {
+    00000050                        108 00110$:
+                                    109 ;src/main.c:34: UINT8 keys = joypad();
+    00000050 CDr00r00         [24]  110 	call	_joypad
+                                    111 ;src/main.c:36: if(keys & J_LEFT) {
+    00000053 CB 4F            [ 8]  112 	bit	1, a
+    00000055 28 01            [12]  113 	jr	Z, 00102$
+                                    114 ;src/main.c:37: x--;
+    00000057 0D               [ 4]  115 	dec	c
+    00000058                        116 00102$:
+                                    117 ;src/main.c:39: if(keys & J_RIGHT) {
+    00000058 CB 47            [ 8]  118 	bit	0, a
+    0000005A 28 01            [12]  119 	jr	Z, 00104$
+                                    120 ;src/main.c:40: x++;
+    0000005C 0C               [ 4]  121 	inc	c
+    0000005D                        122 00104$:
+                                    123 ;src/main.c:42: if(keys & J_UP) {
+    0000005D CB 57            [ 8]  124 	bit	2, a
+    0000005F 28 01            [12]  125 	jr	Z, 00106$
+                                    126 ;src/main.c:43: y--;
+    00000061 05               [ 4]  127 	dec	b
+    00000062                        128 00106$:
+                                    129 ;src/main.c:45: if(keys & J_DOWN) {
+    00000062 CB 5F            [ 8]  130 	bit	3, a
+    00000064 28 01            [12]  131 	jr	Z, 00108$
+                                    132 ;src/main.c:46: y++;
+    00000066 04               [ 4]  133 	inc	b
+    00000067                        134 00108$:
+                                    135 ;c:\gbdk\include\gb\gb.h:1961: OAM_item_t * itm = &shadow_OAM[nb];
+                                    136 ;c:\gbdk\include\gb\gb.h:1962: itm->y=y, itm->x=x;
+    00000067 21r00r00         [12]  137 	ld	hl, #_shadow_OAM
+    0000006A 70               [ 8]  138 	ld	(hl), b
+    0000006B 21r01r00         [12]  139 	ld	hl, #(_shadow_OAM + 1)
+    0000006E 71               [ 8]  140 	ld	(hl), c
+                                    141 ;src/main.c:53: wait_vbl_done();
+    0000006F CDr00r00         [24]  142 	call	_wait_vbl_done
+                                    143 ;src/main.c:55: }
+    00000072 18 DC            [12]  144 	jr	00110$
+                                    145 	.area _CODE
+                                    146 	.area _INITIALIZER
+                                    147 	.area _CABS (ABS)

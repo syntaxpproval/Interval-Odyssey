@@ -103,7 +103,10 @@ typedef struct {
     UINT8 cursor_y;       // For popup menu
     UINT8 confirm_cursor; // For YES/NO selection
     UINT8 message_timer;  // For status messages
-    PROMPT_STATE prompt_state;
+    UINT8 operation_delay;      // Delay counter for operations
+    UINT8 waiting_for_confirm;  // For action confirmation
+    PROMPT_STATE prompt_state;  // Current menu state
+    PROMPT_STATE pending_operation;  // Operation in progress
 } BANK_DATA;
 
 typedef struct {
