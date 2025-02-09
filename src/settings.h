@@ -43,6 +43,7 @@ void update_channel_settings(UINT8 channel, UINT8 enabled, UINT8 volume);
 // SRAM functions
 void save_sram_data(void);
 void load_sram_data(void);
+void load_sram_structure(void);
 
 extern GameSettings settings;
 

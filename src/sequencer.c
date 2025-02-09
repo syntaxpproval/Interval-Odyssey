@@ -852,37 +852,14 @@ static void update_parameter_display(void) {
 }
 
 static void switch_bank(BANK_ID new_bank) {
-    // First, save current bank's state
+    // Save current state
     BANK_ID old_bank = sequencer.bank_data.current_bank;
-    CHANNEL_DATA* old_bank_storage = (old_bank == BANK_A) ?
-        sequencer.bank_data.storage.bank_a : sequencer.bank_data.storage.bank_b;
     
-    // Save current pattern to the old bank's storage
-    for(UINT8 i = 0; i < SEQ_NUM_CHANNELS; i++) {
-        old_bank_storage[i] = sequencer.channels[i];  // Struct copy
-    }
-    
-    // Mark old bank as having data
-    if(old_bank == BANK_A) {
-        sequencer.bank_data.storage.bank_a_exists = 1;
-    } else {
-        sequencer.bank_data.storage.bank_b_exists = 1;
-    }
-    
-    // Switch to new bank
+    // Switch bank
     sequencer.bank_data.current_bank = new_bank;
-    
-    // Load new bank's data if it exists, otherwise clear
-    if((new_bank == BANK_A && sequencer.bank_data.storage.bank_a_exists) ||
-       (new_bank == BANK_B && sequencer.bank_data.storage.bank_b_exists)) {
-        CHANNEL_DATA* new_bank_storage = (new_bank == BANK_A) ?
-            sequencer.bank_data.storage.bank_a : sequencer.bank_data.storage.bank_b;
-        
-        // Load pattern from new bank's storage
-        for(UINT8 i = 0; i < SEQ_NUM_CHANNELS; i++) {
-            sequencer.channels[i] = new_bank_storage[i];  // Struct copy
-        }
-    } else {
+
+    // Always use clear_current_pattern for Bank B first switch
+    if(new_bank == BANK_B && !sequencer.bank_data.storage.bank_b_exists) {
         clear_current_pattern();
     }
     
@@ -1430,23 +1407,11 @@ void init_sequencer(void) {
    
    memset(&sequencer, 0, sizeof(SEQUENCER_DATA));
    
-   // Initialize with clear patterns regardless of SRAM state
-   clear_current_pattern();
+   // Explicitly set both banks to not exist on startup
+   sequencer.bank_data.storage.bank_a_exists = 0;
+   sequencer.bank_data.storage.bank_b_exists = 0;
    
-   // Initialize bank system
-   sequencer.bank_data.current_bank = BANK_A;
-   sequencer.bank_data.is_switching = 0;
-   sequencer.bank_data.switch_pending = 0;
-   sequencer.bank_data.has_copy = 0;
-   
-   // Load SRAM data but don't auto-load patterns
-   load_sram_data();
-   
-   sequencer.tempo = 120;
-   sequencer.chord_mode = 0;
-   sequencer.global_transpose = 0;
-   
-   // Initialize bank system
+   // Initialize bank system once
    sequencer.bank_data.current_bank = BANK_A;
    sequencer.bank_data.is_switching = 0;
    sequencer.bank_data.switch_pending = 0;
@@ -1458,58 +1423,57 @@ void init_sequencer(void) {
    sequencer.bank_data.waiting_for_confirm = 0;
    sequencer.bank_data.prompt_state = PROMPT_NONE;
    sequencer.bank_data.pending_operation = PROMPT_NONE;
+   
+   // Initialize base system parameters
+   sequencer.tempo = 120;
+   sequencer.chord_mode = 0;
+   sequencer.global_transpose = 0;
    sequencer.menu_layer = MENU_MAIN;
    sequencer.needs_redraw = 1;
-   sequencer.last_parameter = 0;    // Initialize tracking
-   sequencer.last_cursor_pos = 0;   // Initialize tracking
+   sequencer.last_parameter = 0;
+   sequencer.last_cursor_pos = 0;
    
-   calculate_frames_per_step();
-   
-   // Initialize first two channels as square waves
-   for(UINT8 ch = 0; ch < 2; ch++) {
-       sequencer.channels[ch].enabled = 1;
-       sequencer.channels[ch].type = 0;  // Start at type 1
-       sequencer.channels[ch].muted = 0;  // Initialize unmuted state
+   // First initialize both storage banks with proper channel types
+   for(UINT8 bank = 0; bank < 2; bank++) {
+       CHANNEL_DATA* channels = (bank == 0) ? 
+           sequencer.bank_data.storage.bank_a : sequencer.bank_data.storage.bank_b;
        
-       // Initialize steps for each channel
-       for(UINT8 i = 0; i < SEQ_MAX_STEPS; i++) {
-           sequencer.channels[ch].steps[i].armed = 0;
-           sequencer.channels[ch].steps[i].note = 24;  // C5
-           sequencer.channels[ch].steps[i].volume = 15;
-           sequencer.channels[ch].steps[i].attack = 0;
-           sequencer.channels[ch].steps[i].decay = 1;
+       for(UINT8 ch = 0; ch < SEQ_NUM_CHANNELS; ch++) {
+           channels[ch].enabled = 1;
+           channels[ch].muted = 0;
+           
+           // Set proper channel types
+           if(ch < 2) channels[ch].type = TYPE_SQUARE;
+           else if(ch == 2) channels[ch].type = TYPE_WAVE;
+           else channels[ch].type = TYPE_NOISE;
+           
+           // Initialize steps
+           for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
+               channels[ch].steps[step].armed = 0;
+               channels[ch].steps[step].note = 24;  // C5
+               channels[ch].steps[step].volume = 15;
+               channels[ch].steps[step].attack = 0;
+               channels[ch].steps[step].decay = 1;
+           }
        }
    }
-
-   // Debug initial channel types
-   char debug[21];
-   sprintf(debug, "INIT CH1 T:%d", sequencer.channels[0].type);
-   draw_text(0, 15, debug);
-
    
-   // Initialize channel 3 as wave
-   sequencer.channels[2].enabled = 1;
-   sequencer.channels[2].type = TYPE_WAVE;
-   sequencer.channels[2].muted = 0;
-   for(UINT8 i = 0; i < SEQ_MAX_STEPS; i++) {
-       sequencer.channels[2].steps[i].armed = 0;
-       sequencer.channels[2].steps[i].note = 24;  // C5
-       sequencer.channels[2].steps[i].volume = 15;
-       sequencer.channels[2].steps[i].attack = 0;
-       sequencer.channels[2].steps[i].decay = 1;
+   // Initialize both banks with clear patterns
+   sequencer.bank_data.current_bank = BANK_A;
+   clear_current_pattern();
+   sequencer.bank_data.current_bank = BANK_B;
+   clear_current_pattern();
+   sequencer.bank_data.current_bank = BANK_A;  // Return to Bank A
+   
+   // Initialize current channels (same as Bank A)
+   for(UINT8 ch = 0; ch < SEQ_NUM_CHANNELS; ch++) {
+       sequencer.channels[ch] = sequencer.bank_data.storage.bank_a[ch];
    }
-
-   // Initialize channel 4 as noise
-   sequencer.channels[3].enabled = 1;
-   sequencer.channels[3].type = TYPE_NOISE;
-   sequencer.channels[3].muted = 0;
-   for(UINT8 i = 0; i < SEQ_MAX_STEPS; i++) {
-       sequencer.channels[3].steps[i].armed = 0;
-       sequencer.channels[3].steps[i].note = 24;  // We'll use note for noise frequency
-       sequencer.channels[3].steps[i].volume = 15;
-       sequencer.channels[3].steps[i].attack = 0;
-       sequencer.channels[3].steps[i].decay = 1;
-   }
+   
+   // Load SRAM structure last
+   load_sram_structure();
+   
+   calculate_frames_per_step();
    
    // Initialize sound hardware
    NR52_REG = 0x80;  // Sound on
