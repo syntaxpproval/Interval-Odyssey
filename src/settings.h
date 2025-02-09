@@ -8,9 +8,6 @@
 
 // SRAM Data Structure
 __at (0xA000) PATTERN_BANKS sram_banks;
-
-// Define SRAM section
-__at (0xA000) PATTERN_BANKS sram_banks;
 #define SRAM_MAGIC_NUMBER 0x4F44  // 'OD' for Interval Odyssey
 #define SRAM_VERSION 0x01         // Version 1 of save format
 

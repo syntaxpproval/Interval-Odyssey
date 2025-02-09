@@ -6,38 +6,101 @@ The sequencer is a core component of the music mode, allowing players to create 
 ## Current Implementation Status
 
 ### Sound Channels
-- Channel 1: Implemented (Square wave, 50% duty)
-- Channel 2: Implemented (Square wave, 25% duty)
-- Channel 3: Planned (Wave)
-- Channel 4: Planned (Noise)
+- Channel 1: Implemented (Square wave with variable duty cycle)
+- Channel 2: Implemented (Square wave with variable duty cycle)
+- Channel 3: Implemented (Wave channel with multiple waveforms)
+- Channel 4: Implemented (Noise with frequency control)
 
 ### Note Range
-- Working range: C5-G8
-- Partial range: C4-B4 (working)
-- Problematic range: A3-B3 (plays incorrectly)
+- Full working range: A3-G8
+- All channels fully functional
+- Proper frequency calculations implemented
 
 ### Sequencer Features
 - 16-step sequence per channel
-- Independent channel patterns
+- Pattern Banks (A/B) with independent storage
 - Channel muting
 - Test tone preview
 - Tempo control (60-240 BPM)
 - Visual step feedback
+- Save/Load functionality
+- Copy/Paste between banks
+- Bank switching during playback
+- Global transpose (-12 to +12 semitones)
+- Chord mode
 
 ### Parameters
 #### Implemented
 - Note selection (A3-G8)
 - Step arming/disarming
+- Attack (0-6)
+- Decay (1-6)
+- Volume (0-15)
+- Channel type selection
 - Channel muting
-- Channel selection
+- Bank selection (A/B)
 
-#### Pending Implementation
-- Attack
-- Decay
-- Volume control
-- Channel-specific parameters
-- Wave channel settings
-- Noise channel settings
+## Bank System
+
+### Current Implementation
+- Two independent pattern banks (A/B)
+- Each bank stores complete channel data
+- Bank switching during playback
+- Independent save/load per bank
+- Clear function for initialization
+- Copy/Paste between banks
+
+### Planned Expansions
+1. Four-Bank System (A/B/C/D)
+   - Memory Considerations:
+     * Using MBC5+RAM (32KB SRAM)
+     * Four complete pattern storage
+     * Additional bank existence flags
+   - Implementation Requirements:
+     * Expanded BANK_ID enum
+     * Additional storage arrays
+     * Updated UI for 4-bank selection
+     * Enhanced bank switching logic
+
+2. Automatic Bank Transitions
+   - Chain Mode Features:
+     * Configurable bank sequences
+     * Automatic progression
+     * Visual sequence display
+     * Smooth audio transitions
+   - Technical Requirements:
+     * Pre-loading mechanisms
+     * Transition timing control
+     * UI for sequence configuration
+     * Enhanced playback logic
+
+## Performance Optimization
+
+### Current Challenges
+1. CPU Load During Editing
+   - Screen update overhead
+   - Bank switching delays
+   - Pattern display redraw
+   - Memory operation costs
+
+### Planned Optimizations
+1. Display Updates
+   - Reduced redraw frequency
+   - More granular update flags
+   - Optimized VRAM writes
+   - Double buffering consideration
+
+2. Memory Operations
+   - Efficient bank switching
+   - Data caching strategies
+   - Optimized copy operations
+   - Strategic use of VBlank
+
+3. General Improvements
+   - CPU usage profiling
+   - Critical path optimization
+   - Pattern editing efficiency
+   - Smoother transitions
 
 ## Interface Layout
 
@@ -45,22 +108,27 @@ The sequencer is a core component of the music mode, allowing players to create 
 - Channel selection (1-4)
 - Tempo control (♪=60-240)
 - Grid display
+- Bank selection (A/B)
+- Chord mode toggle
+- Transpose control
+- Pattern tools (Save/Load/Copy/Paste/Clear)
 
 ### Parameter Menu
 - Step control
 - Note selection
-- Attack (pending)
-- Decay (pending)
-- Volume (pending)
+- Attack/Decay
+- Volume
 - Type selection
 - Mute toggle
 - Exit to channel select
 
 ### Display Elements
-- Sequencer grid (4x4)
-- Parameter values (centered display)
+- Sequencer grid (4x16)
+- Parameter values
+- Bank indicator
+- Playback position
 - Current channel indicator
-- Context-sensitive controls
+- Status messages
 
 ## Controls
 
@@ -68,61 +136,38 @@ The sequencer is a core component of the music mode, allowing players to create 
 - Up/Down: Move between parameters
 - Left/Right: Modify selected parameter
 - A: Toggle/Activate
+- B: Return/Cancel
 - SELECT: Test tone
 - START: Play/Stop sequence
 
 ### Parameter Ranges
 - Notes: A3-G8 (chromatic)
 - Tempo: 60-240 BPM
-- Attack/Decay: 0-15 (pending)
-- Volume: 0-15 (pending)
+- Attack: 0-6
+- Decay: 1-6
+- Volume: 0-15
+- Transpose: -12 to +12
 
 ## Technical Notes
 
 ### Sound Implementation
 - Hardware register direct control
-- Channel 1: NR10-NR14
-- Channel 2: NR21-NR24
-- Duty cycle differentiation
-- Channel muting via volume control
+- Channels 1-4 fully implemented
+- Envelope control
+- Variable duty cycles
+- Wave patterns
+- Noise parameters
 
-### Known Issues
-1. Screen Update Performance
-   - Inefficient redraw system
-   - Multiple redundant updates
-   - High CPU usage during editing
+### SRAM Management
+- MBC5+RAM configuration
+- 32KB SRAM usage
+- Pattern bank storage
+- Save validation
+- Battery backup
 
-2. Audio Issues
-   - Low register note calculation errors
-   - Phase issues in multi-channel playback
-   - Limited sound parameter control
-
-3. Interface Limitations
-   - Step editing efficiency
-   - Grid visualization updates
-   - Parameter control granularity
-
-### Future Enhancements
-1. Technical Improvements
-   - Optimize screen updates
-   - Implement display buffering
-   - Reduce CPU overhead
-   - Fix low register calculations
-
-2. Feature Additions
-   - Channel 3 & 4 support
-   - Sound parameter implementation
-   - Chord mode
-   - Button macro system
-
-3. UI Enhancements
-   - Improved grid editing
-   - Better visual feedback
-   - More intuitive controls
-   - Enhanced parameter display
-
-## Development References
+### Development References
 - GameBoy CPU Manual
 - Pan Docs (Sound Controller)
 - BGB Debugger notes
 - Hardware register map
+- GBDK 2020 documentation

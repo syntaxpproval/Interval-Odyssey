@@ -852,15 +852,49 @@ static void update_parameter_display(void) {
 }
 
 static void switch_bank(BANK_ID new_bank) {
-    // Save current state
     BANK_ID old_bank = sequencer.bank_data.current_bank;
+    
+    // Save current bank state to storage
+    CHANNEL_DATA* old_storage = (old_bank == BANK_A) ?
+        sequencer.bank_data.storage.bank_a : sequencer.bank_data.storage.bank_b;
+    
+    // Deep copy current channels to old bank storage
+    for(UINT8 i = 0; i < SEQ_NUM_CHANNELS; i++) {
+        old_storage[i] = sequencer.channels[i];
+        for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
+            old_storage[i].steps[step] = sequencer.channels[i].steps[step];
+        }
+    }
     
     // Switch bank
     sequencer.bank_data.current_bank = new_bank;
-
-    // Always use clear_current_pattern for Bank B first switch
+    
+    // Load new bank state
+    CHANNEL_DATA* new_storage = (new_bank == BANK_A) ?
+        sequencer.bank_data.storage.bank_a : sequencer.bank_data.storage.bank_b;
+    
+    // If this is first time accessing Bank B, clear it and save the cleared state
     if(new_bank == BANK_B && !sequencer.bank_data.storage.bank_b_exists) {
-        clear_current_pattern();
+        clear_current_pattern();  // Clear working channels
+        
+        // Save cleared state to Bank B storage
+        for(UINT8 i = 0; i < SEQ_NUM_CHANNELS; i++) {
+            sequencer.bank_data.storage.bank_b[i] = sequencer.channels[i];
+            for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
+                sequencer.bank_data.storage.bank_b[i].steps[step] = 
+                    sequencer.channels[i].steps[step];
+            }
+        }
+        
+        sequencer.bank_data.storage.bank_b_exists = 1;  // Mark as initialized
+    } else {
+        // Deep copy from storage to working channels
+        for(UINT8 i = 0; i < SEQ_NUM_CHANNELS; i++) {
+            sequencer.channels[i] = new_storage[i];
+            for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
+                sequencer.channels[i].steps[step] = new_storage[i].steps[step];
+            }
+        }
     }
     
     update_pattern_display();
@@ -1433,42 +1467,48 @@ void init_sequencer(void) {
    sequencer.last_parameter = 0;
    sequencer.last_cursor_pos = 0;
    
-   // First initialize both storage banks with proper channel types
-   for(UINT8 bank = 0; bank < 2; bank++) {
-       CHANNEL_DATA* channels = (bank == 0) ? 
-           sequencer.bank_data.storage.bank_a : sequencer.bank_data.storage.bank_b;
+   // Initialize Bank A first
+   sequencer.bank_data.current_bank = BANK_A;
+   sequencer.bank_data.storage.bank_a_exists = 1;  // Mark Bank A as existing
+   
+   // Initialize working channels with default values
+   for(UINT8 ch = 0; ch < SEQ_NUM_CHANNELS; ch++) {
+       sequencer.channels[ch].enabled = 1;
+       sequencer.channels[ch].muted = 0;
        
-       for(UINT8 ch = 0; ch < SEQ_NUM_CHANNELS; ch++) {
-           channels[ch].enabled = 1;
-           channels[ch].muted = 0;
-           
-           // Set proper channel types
-           if(ch < 2) channels[ch].type = TYPE_SQUARE;
-           else if(ch == 2) channels[ch].type = TYPE_WAVE;
-           else channels[ch].type = TYPE_NOISE;
-           
-           // Initialize steps
-           for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
-               channels[ch].steps[step].armed = 0;
-               channels[ch].steps[step].note = 24;  // C5
-               channels[ch].steps[step].volume = 15;
-               channels[ch].steps[step].attack = 0;
-               channels[ch].steps[step].decay = 1;
-           }
+       // Set proper channel types
+       if(ch < 2) sequencer.channels[ch].type = TYPE_SQUARE;
+       else if(ch == 2) sequencer.channels[ch].type = TYPE_WAVE;
+       else sequencer.channels[ch].type = TYPE_NOISE;
+       
+       // Initialize steps
+       for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
+           sequencer.channels[ch].steps[step].armed = 0;
+           sequencer.channels[ch].steps[step].note = 24;  // C5
+           sequencer.channels[ch].steps[step].volume = 15;
+           sequencer.channels[ch].steps[step].attack = 0;
+           sequencer.channels[ch].steps[step].decay = 1;
        }
    }
    
-   // Initialize both banks with clear patterns
-   sequencer.bank_data.current_bank = BANK_A;
-   clear_current_pattern();
-   sequencer.bank_data.current_bank = BANK_B;
-   clear_current_pattern();
-   sequencer.bank_data.current_bank = BANK_A;  // Return to Bank A
-   
-   // Initialize current channels (same as Bank A)
+   // Save initial state to Bank A storage
    for(UINT8 ch = 0; ch < SEQ_NUM_CHANNELS; ch++) {
-       sequencer.channels[ch] = sequencer.bank_data.storage.bank_a[ch];
+       sequencer.bank_data.storage.bank_a[ch] = sequencer.channels[ch];
+       for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
+           sequencer.bank_data.storage.bank_a[ch].steps[step] = 
+               sequencer.channels[ch].steps[step];
+       }
    }
+   
+   // Initialize Bank B storage with the same default state
+   for(UINT8 ch = 0; ch < SEQ_NUM_CHANNELS; ch++) {
+       sequencer.bank_data.storage.bank_b[ch] = sequencer.channels[ch];
+       for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
+           sequencer.bank_data.storage.bank_b[ch].steps[step] = 
+               sequencer.channels[ch].steps[step];
+       }
+   }
+   // Do not mark Bank B as existing yet - it will be marked when first switched to
    
    // Load SRAM structure last
    load_sram_structure();

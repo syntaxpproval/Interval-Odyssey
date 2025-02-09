@@ -46,42 +46,21 @@ void load_sram_structure(void) {
     // Check if SRAM needs initialization
     if (!validate_sram()) {
         init_sram();
+        DISABLE_RAM;
+        return;
     }
 
-    // On initial load, don't copy any data, just ensure bank existence flags match initialization
-    if (sram_banks.bank_b_exists) {
-        // If Bank B exists in SRAM, also load its pattern data
-        memcpy(&sequencer.bank_data.storage.bank_b, &sram_banks.bank_b, 
+    // Load both banks' data if they exist
+    if (sram_banks.bank_a_exists) {
+        memcpy(&sequencer.bank_data.storage.bank_a, &sram_banks.bank_a, 
                sizeof(CHANNEL_DATA) * SEQ_NUM_CHANNELS);
-    } else {
-        // If Bank B doesn't exist, ensure its storage is properly zeroed
-        memset(&sequencer.bank_data.storage.bank_b, 0, 
-               sizeof(CHANNEL_DATA) * SEQ_NUM_CHANNELS);
-        
-        // Initialize Bank B channels with proper defaults
-        for(UINT8 ch = 0; ch < SEQ_NUM_CHANNELS; ch++) {
-            sequencer.bank_data.storage.bank_b[ch].enabled = 1;
-            sequencer.bank_data.storage.bank_b[ch].muted = 0;
-            
-            // Set channel types
-            if(ch < 2) sequencer.bank_data.storage.bank_b[ch].type = TYPE_SQUARE;
-            else if(ch == 2) sequencer.bank_data.storage.bank_b[ch].type = TYPE_WAVE;
-            else sequencer.bank_data.storage.bank_b[ch].type = TYPE_NOISE;
-            
-            // Initialize each step properly
-            for(UINT8 step = 0; step < SEQ_MAX_STEPS; step++) {
-                sequencer.bank_data.storage.bank_b[ch].steps[step].armed = 0;
-                sequencer.bank_data.storage.bank_b[ch].steps[step].note = 24;  // C5
-                sequencer.bank_data.storage.bank_b[ch].steps[step].volume = 15;
-                sequencer.bank_data.storage.bank_b[ch].steps[step].attack = 0;
-                sequencer.bank_data.storage.bank_b[ch].steps[step].decay = 1;
-            }
-        }
     }
     
-    // Now load existence flags
+    // Don't load Bank B data - let switch_bank handle it
+    // Just set the existence flag
     sequencer.bank_data.storage.bank_a_exists = sram_banks.bank_a_exists;
-    sequencer.bank_data.storage.bank_b_exists = sram_banks.bank_b_exists;
+    sequencer.bank_data.storage.bank_b_exists = 0;  // Always start with Bank B as non-existent
+    
     DISABLE_RAM;
 }
 

@@ -1,47 +1,49 @@
-Development Log - Interval Odyssey
-============================
+We're working on a GameBoy game with GBDK2020, specifically a music sequencer
+We've just implemented SRAM saving functionality
+We're currently fixing UI rendering issues specifically in the SAVE COPY LOAD CLEAR menu, particularly when:
 
-Session 2024-02-04
------------------
+LOADing a pattern
+PASTEing a pattern
+Exiting the menu
 
-Current Issues:
-1. Input Handling:
-   - Very fast/sensitive up/down movement in Main Menu
-   - A button not working for Music Mode or main game selection
-   - These issues appeared after SRAM implementation
 
-2. ROM Banking/Build Issues:
-   - Warning about overflow in implicit constant conversion in sequencer.c
-   - ROM size issues when using ROM banking
-   - Current workaround: removed ROM banking (-Wf-bo4) but kept SRAM banking (-Wf-ba4)
+The specific issues we're trying to fix:
 
-3. SRAM Implementation:
-   - Basic SRAM structure is in place but functionality untested due to build issues
-   - Need to verify pattern saving/loading once build issues are resolved
+Menu becomes invisible during LOAD/PASTE confirmation
+We want to add a short delay when loading/pasting
+We're also fixing compiler errors related to pending_operation becoming a part of the BANK_DATA structure instead of being a static variable
 
-Goals for Next Session:
-1. Investigate input handling issues:
-   - Check if SRAM implementation in settings.c is affecting input
-   - Consider moving SRAM code to separate save_manager.c/h
-   - Review entire input handling chain for potential conflicts
 
-2. Resolve Build Configuration:
-   - Find proper balance between ROM banking and SRAM needs
-   - Current build works but with input issues
-   - May need to restructure code to better fit memory constraints
+The immediate errors we're getting are multiple "undefined identifier 'pending_operation'" because we need to update all references to use sequencer.bank_data.pending_operation instead.
 
-3. Test and Complete SRAM Features:
-   - Once build is stable, test pattern saving/loading
-   - Verify bank A/B pattern preservation
-   - Implement permanent save functionality
+Would you like me to list out the specific files we've been working with as well?
 
-Technical Notes:
-- SRAM is configured with -Wf-ba4 flag
-- Removed ROM banking due to size issues
-- sequencer.c has an overflow warning that needs attention
-- Current focus should be on fixing input before proceeding with save functionality
+Here are the key files we've been working with:
 
-Next Steps:
-1. Focus on input handling first
-2. Then address ROM banking/memory organization
-3. Finally implement and test SRAM features
+Main files needing changes:
+
+Copy
+C:\gbdev\interval-odyssey-gb\src\sequencer.c
+C:\gbdev\interval-odyssey-gb\src\sequencer.h
+Related files for context:
+
+Copy
+C:\gbdev\interval-odyssey-gb\src\settings.c
+C:\gbdev\interval-odyssey-gb\src\settings.h
+The major changes we just made but need to fix:
+
+In sequencer.h:
+
+Added operation_delay and pending_operation to BANK_DATA structure
+In sequencer.c:
+
+Initialized new variables in init_sequencer()
+Added delay handling in update_sequencer()
+Need to fix all instances of bare pending_operation to use sequencer.bank_data.pending_operation
+The current errors are around undefined pending_operation identifiers since we moved it into the BANK_DATA structure but haven't updated all references yet.
+
+There's also a warning about overflow in implicit constant conversion at src/sequencer.c:335 that we haven't addressed yet.
+
+Should I include the current file contents to help the new chat get started?
+
+ 
