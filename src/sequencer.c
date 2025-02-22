@@ -37,6 +37,7 @@
 #include "sound.h"
 #include "sequencer.h"
 #include "settings.h"
+#include "sound_asm.h"
 
 SEQUENCER_DATA sequencer;
 
@@ -297,206 +298,33 @@ static void safe_set_parameter(UINT8* param, UINT8 new_value, UINT8 min_val, UIN
 }
 
 static void play_sequencer_note(UINT8 channel, UINT8 note_idx) {
-    // Skip if channel is muted
     if(sequencer.channels[channel].muted) return;
     
-    // Apply global transpose to note_idx, ensuring we stay within valid note range
     INT16 transposed_note = (INT16)note_idx + sequencer.global_transpose;
     if(transposed_note < SEQ_MIN_NOTE) transposed_note = SEQ_MIN_NOTE;
     if(transposed_note > SEQ_MAX_NOTE) transposed_note = SEQ_MAX_NOTE;
     
-    UINT16 freq = get_note_frequency(transposed_note);
-    
-    // Get current step's envelope parameters
     SEQUENCER_STEP* step = &sequencer.channels[channel].steps[sequencer.playback_step];
     
-    // Configure envelope based on attack/decay
-    UINT8 envelope = 0;
+    asmPlaySequencerNote(
+        channel,
+        (UINT8)transposed_note,
+        step->volume,
+        step->attack,
+        step->decay,
+        sequencer.channels[channel].type
+    );
+
     if(step->attack > 0) {
-        UINT8 attack_val = (step->attack & 0x07);
-        if(attack_val < 7) attack_val++;  // Ensure we don't overflow
-        envelope = (0x00 << 4) |      // Initial volume = 0
-                  0x08 |             // Direction = up
-                  attack_val;         // Step length 1-7
-        
-        // Set duration for envelope tracking
         sequencer.envelope_duration[channel] = (step->attack * 8) + (step->decay * 8);
     } else {
-        // No attack: Start at full volume
-        envelope = (0x0F << 4);      // Initial volume = 15
-        
-        if(step->decay > 0) {
-            UINT8 decay_val = (step->decay & 0x07);
-            if(decay_val < 7) decay_val++;
-            envelope |= (0x00) |      // Direction = down
-                       decay_val;     // Step length 1-7
-        } else {
-            envelope |= 0x00;         // No envelope change
-        }
-        sequencer.envelope_duration[channel] = 0; // No tracking needed
-    }
-    
-    switch(channel) {
-        case 0: // Channel 1 - Square wave with variable duty cycle
-            NR10_REG = 0x00;  // No sweep
-            // Set duty cycle based on type
-            switch(sequencer.channels[channel].type) {
-                case 0: // Type 1 - Standard
-                    NR11_REG = CH2_DUTY_50 | 0x3F;  // 50% duty cycle
-                    break;
-                case 1: // Type 2 - Thinner
-                    NR11_REG = CH2_DUTY_25 | 0x3F;  // 25% duty cycle
-                    break;
-                case 2: // Type 3 - Inverse of Type 2
-                    NR11_REG = CH2_DUTY_12_5 | 0x3F;  // 12.5% duty cycle
-                    break;
-            }
-            NR12_REG = envelope;
-            NR13_REG = (UINT8)(freq & 0xFF);
-            NR14_REG = 0x80 | ((freq >> 8) & 0x07);
-            break;
-            
-        case 1: // Channel 2 - Square wave with variable duty cycle
-            switch(sequencer.channels[channel].type) {
-                case 0: // Type 1 - Sharp pulse
-                    NR21_REG = CH2_DUTY_12_5 | 0x3F;  // 12.5% duty cycle
-                    NR22_REG = (envelope & 0xF8) | 0x04;  // Faster decay
-                    break;
-                case 1: // Type 2 - Rich pulse
-                    NR21_REG = CH2_DUTY_25 | 0x3F;   // 25% duty cycle
-                    NR22_REG = (envelope & 0xF8) | 0x02;  // Medium decay
-                    break;
-                case 2: // Type 3 - Square buzz
-                    NR21_REG = CH2_DUTY_50 | 0x3F;   // 50% duty cycle
-                    NR22_REG = (envelope & 0xF8) | 0x01;  // Slow decay
-                    break;
-            }
-            NR23_REG = (UINT8)(freq & 0xFF);
-            NR24_REG = 0x80 | ((freq >> 8) & 0x07);
-            break;
-            
-        case 2: // Channel 3 - Wave
-            NR30_REG = 0x00;  // Disable channel 3 before writing to wave RAM
-            
-            // Set wave pattern based on type
-            switch(sequencer.channels[channel].type) {
-                case 0: // Type 1 - Triangle wave
-                    {
-                        const UINT8 triangle_wave[] = {
-                            0x01, 0x23, 0x45, 0x67,
-                            0x89, 0xAB, 0xCD, 0xEF,
-                            0xFE, 0xDC, 0xBA, 0x98,
-                            0x76, 0x54, 0x32, 0x10
-                        };
-                        for(UINT8 i = 0; i < 16; i++) {
-                            *((UINT8*)(0xFF30 + i)) = triangle_wave[i];
-                        }
-                    }
-                    break;
-                    
-                case 1: // Type 2 - Sawtooth wave
-                    {
-                        const UINT8 sawtooth_wave[] = {
-                            0x01, 0x12, 0x23, 0x34,
-                            0x45, 0x56, 0x67, 0x78,
-                            0x89, 0x9A, 0xAB, 0xBC,
-                            0xCD, 0xDE, 0xEF, 0xFF
-                        };
-                        for(UINT8 i = 0; i < 16; i++) {
-                            *((UINT8*)(0xFF30 + i)) = sawtooth_wave[i];
-                        }
-                    }
-                    break;
-                    
-                case 2: // Type 3 - Sine wave
-                    {
-                        const UINT8 sine_wave[] = {
-                            0x89, 0xAB, 0xCD, 0xEF,
-                            0xFE, 0xFE, 0xFE, 0xEF,
-                            0xCD, 0xAB, 0x89, 0x67,
-                            0x45, 0x23, 0x01, 0x01
-                        };
-                        for(UINT8 i = 0; i < 16; i++) {
-                            *((UINT8*)(0xFF30 + i)) = sine_wave[i];
-                        }
-                    }
-                    break;
-            }
-            
-            NR30_REG = 0x80;  // Enable wave channel
-            
-            // Handle decay values
-            UINT8 length_value;
-            if(step->decay == 0) {
-                length_value = 0;  // Maximum length
-            } else {
-                switch(step->decay) {
-                    case 1: length_value = 128; break;  // ~0.75s - shortest
-                    case 2: length_value = 48;  break;  // ~0.81s
-                    case 3: length_value = 32;  break;  // ~0.875s
-                    case 4: length_value = 24;  break;  // ~0.91s
-                    case 5: length_value = 16;  break;  // ~0.94s
-                    case 6: length_value = 8;   break;  // ~0.97s - longest
-                    default: length_value = 128; break;  // Fallback to shortest
-                }
-            }
-            NR31_REG = length_value;
-            
-            // Set initial volume based on attack
-            UINT8 vol_code;
-            if(step->attack > 0) {
-                vol_code = 0x60;  // 25% volume to start
-            } else {
-                vol_code = 0x20;  // 100% volume
-            }
-            NR32_REG = vol_code;
-            
-            NR33_REG = (UINT8)(freq & 0xFF);
-            NR34_REG = 0xC0 | ((freq >> 8) & 0x07);
-            break;
-            
-        case 3: // Channel 4 - Noise
-            // Configure envelope like channels 1 & 2
-            NR42_REG = envelope;
-            
-            // Map note value to noise frequency
-            // note range 9-67 maps to full noise range
-            UINT8 shift = (note_idx - SEQ_MIN_NOTE) >> 3;  // 0-7 shift values
-            UINT8 divisor = (note_idx - SEQ_MIN_NOTE) & 0x07;  // 0-7 divisor
-            NR43_REG = (shift << 4) | divisor;
-            
-            // Set length and trigger sound
-            NR41_REG = 0;  // No length limit
-            NR44_REG = 0x80;  // Trigger sound
-            break;
+        sequencer.envelope_duration[channel] = 0;
     }
 }
 
 static void stop_sequencer_note(UINT8 channel) {
-   // Get current step for decay settings
    SEQUENCER_STEP* step = &sequencer.channels[channel].steps[sequencer.playback_step];
-   UINT8 decay = step->decay & 0x07;
-   
-   switch(channel) {
-       case 0:
-           // Set envelope to decay only
-           NR12_REG = decay;
-           break;
-       case 1:
-           // Set envelope to decay only
-           NR22_REG = decay;
-           break;
-       case 2:
-           // Stop wave by setting length to max and enabling length counter
-           NR31_REG = 0xFF;
-           NR34_REG = 0x40;  // Enable length counter (bit 6)
-           break;
-           
-       case 3:
-           // Set envelope to decay only like channels 1 & 2
-           NR42_REG = decay;
-           break;
-   }
+   asmStopSequencerNote(channel, step->decay & 0x07);
 }
 
 static void calculate_frames_per_step(void) {
@@ -1402,29 +1230,26 @@ void update_sequencer(void) {
             draw_special_tile(SEQ_START_X + sequencer.playback_step, SEQ_POSITION_Y, TILE_RIGHT_ARROW);
             last_playback_step = sequencer.playback_step;
             
-            // Play notes for each enabled channel
-            for(UINT8 ch = 0; ch < 4; ch++) {
-                CHANNEL_DATA* channel = &sequencer.channels[ch];
-                SEQUENCER_STEP* current_step = &channel->steps[sequencer.playback_step];
-                SEQUENCER_STEP* prev_step = &channel->steps[(sequencer.playback_step + SEQ_MAX_STEPS - 1) % SEQ_MAX_STEPS];
-                
-                if(channel->enabled && !channel->muted) {
-                    if(current_step->armed) {
-                        // New note is starting, stop any previous note
-                        if(prev_step->armed) {
-                            stop_sequencer_note(ch);
-                        }
-                        play_sequencer_note(ch, current_step->note);
-                    }
-                    // Check if we need to stop note due to envelope duration
-                    else if(sequencer.envelope_duration[ch] > 0) {
-                        sequencer.envelope_duration[ch]--;
-                        if(sequencer.envelope_duration[ch] == 0) {
-                            stop_sequencer_note(ch);
-                        }
-                    }
-                }
-            }
+						for(UINT8 ch = 0; ch < 4; ch++) {
+				CHANNEL_DATA* channel = &sequencer.channels[ch];
+				SEQUENCER_STEP* current_step = &channel->steps[sequencer.playback_step];
+				SEQUENCER_STEP* prev_step = &channel->steps[(sequencer.playback_step + SEQ_MAX_STEPS - 1) % SEQ_MAX_STEPS];
+				
+				if(channel->enabled && !channel->muted) {
+					if(current_step->armed) {
+						if(prev_step->armed) {
+							stop_sequencer_note(ch);
+						}
+						play_sequencer_note(ch, current_step->note);
+					}
+					else if(sequencer.envelope_duration[ch] > 0) {
+						sequencer.envelope_duration[ch]--;
+						if(sequencer.envelope_duration[ch] == 0) {
+							stop_sequencer_note(ch);
+						}
+					}
+				}
+			}
         }
     }
     

@@ -2,15 +2,9 @@
 #include "sound.h"
 #include "game_types.h"
 #include "sequencer.h"
+#include "sound_asm.h"
 
-static const UINT16 NOTE_FREQS[] = {
-   NOTE_C3, NOTE_Db3, NOTE_D3, NOTE_Eb3, NOTE_E3, NOTE_F3, NOTE_Gb3, NOTE_G3, NOTE_Ab3, NOTE_A3, NOTE_Bb3, NOTE_B3,
-   NOTE_C4, NOTE_Db4, NOTE_D4, NOTE_Eb4, NOTE_E4, NOTE_F4, NOTE_Gb4, NOTE_G4, NOTE_Ab4, NOTE_A4, NOTE_Bb4, NOTE_B4,
-   NOTE_C5, NOTE_Db5, NOTE_D5, NOTE_Eb5, NOTE_E5, NOTE_F5, NOTE_Gb5, NOTE_G5, NOTE_Ab5, NOTE_A5, NOTE_Bb5, NOTE_B5,
-   NOTE_C6, NOTE_Db6, NOTE_D6, NOTE_Eb6, NOTE_E6, NOTE_F6, NOTE_Gb6, NOTE_G6, NOTE_Ab6, NOTE_A6, NOTE_Bb6, NOTE_B6,
-   NOTE_C7, NOTE_Db7, NOTE_D7, NOTE_Eb7, NOTE_E7, NOTE_F7, NOTE_Gb7, NOTE_G7, NOTE_Ab7, NOTE_A7, NOTE_Bb7, NOTE_B7,
-   NOTE_C8, NOTE_Db8, NOTE_D8, NOTE_Eb8, NOTE_E8, NOTE_F8, NOTE_Gb8, NOTE_G8
-};
+extern const UINT16 NOTE_FREQS[];
 
 UINT16 freq_to_period(UINT16 gb_value) {
     return gb_value;
@@ -27,26 +21,6 @@ void init_sound(void) {
     NR52_REG = 0x80;
     NR50_REG = 0x77;
     NR51_REG = 0xFF;
-    init_wave_ram();
-}
-
-void init_wave_ram(void) {
-    // Disable channel 3 before writing to wave RAM
-    NR30_REG = 0x00;
-    
-    // Initialize with simple triangle wave pattern
-    // Each byte contains two 4-bit samples
-    const UINT8 wave_pattern[] = {
-        0x01, 0x23, 0x45, 0x67,
-        0x89, 0xAB, 0xCD, 0xEF,
-        0xFE, 0xDC, 0xBA, 0x98,
-        0x76, 0x54, 0x32, 0x10
-    };
-    
-    // Write pattern to wave RAM ($FF30-FF3F)
-    for(UINT8 i = 0; i < 16; i++) {
-        *((UINT8*)(0xFF30 + i)) = wave_pattern[i];
-    }
 }
 
 void set_ch3_volume(UINT8 volume_code) {

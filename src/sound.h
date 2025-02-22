@@ -134,7 +134,6 @@ void set_ch2_envelope(UINT8 attack, UINT8 decay);
 void play_note_ch3(UINT8 note_idx, UINT8 volume);
 void stop_note_ch3(void);
 void set_ch3_volume(UINT8 volume_code);
-void init_wave_ram(void);
 
 UINT16 get_note_frequency(UINT8 note_idx);
 UINT16 freq_to_period(UINT16 freq);

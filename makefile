@@ -1,7 +1,7 @@
 SOURCES = src/game.c src/game_state.c src/globals.c src/item_manager.c src/map_view.c src/multi.c \
          src/player.c src/quiz_mode.c src/room_manager.c src/room_templates.c src/sound.c \
          src/text.c src/tileset.c src/transition.c src/utils.c src/sequencer.c src/settings.c \
-         src/test_tiles.c
+         src/test_tiles.c src/sound_asm.s
 
 all: build/game.gb
 
